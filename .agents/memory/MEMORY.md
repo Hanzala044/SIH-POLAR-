@@ -1,0 +1,1 @@
+- [PolarLogix prototype boundary](polarlogix-prototype.md) — local-first demo adapter now; preserve the same cascade contract when Supabase realtime is wired.

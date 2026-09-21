@@ -1,1 +1,5 @@
 - [PolarLogix prototype boundary](polarlogix-prototype.md) — local-first demo adapter now; preserve the same cascade contract when Supabase realtime is wired.
+- [Workspace dependency installs](workspace-dependencies.md) — artifact-specific packages need a filtered pnpm install; the generic helper targets the monorepo root.
+- [Supabase schema compatibility](supabase-schema-compatibility.md) — the live project schema predates the local SQL additions; migrate normalized tables before removing the compatibility adapter.
+- [Supabase-only merge setup](supabase-post-merge.md) — post-merge validation must not invoke removed local database filters; use scoped artifact checks instead.
+- [Operator live verification](operator-live-verification.md) — the managed browser tester may be unavailable in Free mode; preserve a server-side Clerk-to-Supabase verification path.

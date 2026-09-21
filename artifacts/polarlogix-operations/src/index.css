@@ -1,3 +1,4 @@
+@layer theme, base, clerk, components, utilities;
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -44,44 +45,44 @@
 }
 
 :root {
-  --background: 204 35% 94%;
-  --foreground: 213 38% 18%;
-  --border: 203 22% 84%;
-  --input: 203 22% 78%;
-  --ring: 188 85% 42%;
-  --card: 204 42% 98%;
-  --card-foreground: 213 38% 18%;
-  --card-border: 203 22% 84%;
-  --popover: 204 42% 98%;
-  --popover-foreground: 213 38% 18%;
-  --popover-border: 203 22% 84%;
-  --primary: 188 83% 34%;
-  --primary-foreground: 204 45% 98%;
-  --secondary: 213 33% 90%;
-  --secondary-foreground: 213 38% 22%;
-  --muted: 202 28% 89%;
-  --muted-foreground: 210 20% 45%;
-  --accent: 35 93% 58%;
-  --accent-foreground: 213 38% 18%;
+  --background: 45 20% 95%;
+  --foreground: 216 31% 18%;
+  --border: 42 13% 83%;
+  --input: 42 13% 76%;
+  --ring: 197 67% 42%;
+  --card: 45 33% 99%;
+  --card-foreground: 216 31% 18%;
+  --card-border: 42 13% 83%;
+  --popover: 45 33% 99%;
+  --popover-foreground: 216 31% 18%;
+  --popover-border: 42 13% 83%;
+  --primary: 197 67% 35%;
+  --primary-foreground: 45 33% 99%;
+  --secondary: 216 24% 91%;
+  --secondary-foreground: 216 31% 22%;
+  --muted: 42 18% 90%;
+  --muted-foreground: 216 12% 45%;
+  --accent: 43 91% 58%;
+  --accent-foreground: 216 31% 18%;
   --destructive: 4 76% 53%;
   --destructive-foreground: 204 45% 98%;
-  --sidebar: 213 45% 15%;
-  --sidebar-foreground: 203 32% 85%;
-  --sidebar-border: 213 32% 25%;
-  --sidebar-primary: 188 83% 44%;
-  --sidebar-primary-foreground: 213 45% 12%;
-  --sidebar-accent: 213 34% 23%;
-  --sidebar-accent-foreground: 204 42% 98%;
+  --sidebar: 216 36% 14%;
+  --sidebar-foreground: 216 24% 84%;
+  --sidebar-border: 216 27% 23%;
+  --sidebar-primary: 43 91% 58%;
+  --sidebar-primary-foreground: 216 36% 13%;
+  --sidebar-accent: 213 32% 28%;
+  --sidebar-accent-foreground: 45 33% 99%;
   --app-font-sans: 'Manrope', sans-serif;
   --app-font-mono: 'DM Mono', monospace;
   --radius: 0.65rem;
-  --primary-border: hsl(188 83% 28%);
-  --secondary-border: hsl(203 22% 78%);
-  --accent-border: hsl(35 82% 48%);
+  --primary-border: hsl(197 67% 28%);
+  --secondary-border: hsl(42 13% 76%);
+  --accent-border: hsl(43 82% 48%);
   --destructive-border: hsl(4 72% 43%);
-  --muted-border: hsl(203 22% 80%);
-  --elevate-1: rgba(21, 55, 77, .045);
-  --elevate-2: rgba(21, 55, 77, .085);
+  --muted-border: hsl(42 13% 78%);
+  --elevate-1: rgba(35, 46, 57, .045);
+  --elevate-2: rgba(35, 46, 57, .085);
 }
 
 * { box-sizing: border-box; }
@@ -107,6 +108,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @keyframes reveal { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse-dot { 50% { opacity: .42; transform: scale(.82); } }
 .pulse-dot { animation: pulse-dot 1.7s ease-in-out infinite; }
+.leaflet-command-button { display: inline-flex; min-height: 30px; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(20,35,55,.92); padding: 0 10px; color: #e6fbff; font: 700 9px var(--app-font-sans); letter-spacing: .08em; }
+.leaflet-popup-card { min-width: 205px; color: #172236; font-family: var(--app-font-sans); }
+.leaflet-popup-link { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; border-radius: 5px; background: #e4f4f5; padding: 0 8px; color: #075b66; font-size: 10px; font-weight: 800; }
+.asset-model { position: relative; display: flex; min-height: 310px; flex-direction: column; overflow: hidden; border-radius: .9rem; background: linear-gradient(145deg, #075b66, #172236 70%); padding: 1.5rem; color: white; box-shadow: inset 0 -36px 80px rgba(0,0,0,.3); }
+.asset-model::before { content: ''; position: absolute; inset: 0; opacity: .22; background-image: linear-gradient(135deg, transparent 48%, rgba(255,255,255,.35) 49%, transparent 50%), linear-gradient(45deg, transparent 48%, rgba(255,255,255,.2) 49%, transparent 50%); background-size: 42px 42px; }
+.asset-model__shape { position: relative; z-index: 1; align-self: center; margin: auto; height: 90px; width: 62%; transform: perspective(420px) rotateX(56deg) rotateZ(-12deg); border: 2px solid rgba(255,255,255,.55); border-radius: 18% 35% 20% 12%; background: linear-gradient(135deg, #f8fafc, #64748b 55%, #172236); box-shadow: 22px 24px 0 rgba(0,0,0,.24), inset 0 -10px 0 rgba(241,183,46,.9); }
+.asset-model--generator .asset-model__shape { height: 105px; width: 48%; transform: perspective(420px) rotateX(52deg) rotateZ(-8deg); border-radius: 12%; }
+.asset-model--instrument .asset-model__shape { height: 120px; width: 30%; transform: perspective(420px) rotateX(55deg) rotateZ(18deg); border-radius: 8%; }
+.asset-model--container .asset-model__shape { height: 78px; width: 64%; transform: perspective(420px) rotateX(55deg) rotateZ(-8deg); border-radius: 5%; }
 
 @media (max-width: 767px) {
   .texture::after { display: none; }

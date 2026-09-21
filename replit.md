@@ -1,49 +1,44 @@
 # PolarLogix Operations
 
-PolarLogix is a polar expedition command-center prototype for planning voyages, tracking cold-chain cargo, managing life-support inventory, monitoring personnel safety, and coordinating emergency lockdown cascades.
+PolarLogix is a polar expedition command center for planning voyages, tracking cold-chain cargo, managing life-support inventory, monitoring personnel safety, and coordinating emergency lockdown cascades.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/api-server run dev` — run the Supabase-backed API server.
+- `pnpm --filter @workspace/polarlogix-operations run dev` — run the authenticated React operations console.
+- `pnpm run typecheck` — full typecheck across all packages.
+- `pnpm run build` — typecheck and build all packages.
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- pnpm workspaces, Node.js 24, TypeScript 5.9.
+- API: Express 5 with Clerk session middleware.
+- Web: React + Vite with Clerk sign-in and sign-up routes.
+- Data: Supabase REST through the server-only service-role client.
+- Schema: Supabase/PostGIS SQL in `artifacts/polarlogix-operations/schema.sql`, applied through a supported Supabase migration path.
 
 ## Where things live
 
 - `artifacts/polarlogix-operations/src/` — React + Vite operations console.
-- `artifacts/polarlogix-operations/schema.sql` — Supabase/PostGIS production schema aligned to the prototype.
-- `artifacts/polarlogix-operations/README.md` — setup and demo flow.
+- `artifacts/polarlogix-operations/schema.sql` — Supabase/PostGIS production schema.
+- `artifacts/api-server/src/lib/supabase.ts` — server-only Supabase client.
+- `artifacts/api-server/src/lib/operations-service.ts` — Supabase CRUD and operational synchronization service.
+- `artifacts/api-server/src/middlewares/clerkProxyMiddleware.ts` — Clerk frontend API proxy for production.
 
 ## Architecture decisions
 
-- The first-build demo uses browser persistence and a shared reactive state layer so every judge-facing action works without requiring third-party credentials.
-- The emergency simulation is intentionally cross-module: weather state drives personnel muster, cargo pause, inventory burn adjustment, and expedition delay.
-- `schema.sql` preserves the production-oriented PostGIS and realtime model from the technical specification for later Supabase wiring.
+- Supabase is the only application data store. Runtime reads, inserts, updates, deletes, CRUD operations, synchronization, and temporary operational state go through the API server to Supabase.
+- The browser never uses localStorage, a browser Supabase client, seeded fallback state, or an offline queue for operational data.
+- The API server does not use Replit PostgreSQL, Drizzle runtime storage, direct Postgres connections, or startup DDL.
+- Clerk manages operator identity and same-origin session cookies. Operations API routes return `401` unless the request has a valid Clerk session.
+- The frontend sends normal same-origin requests to the API. It never receives or sends Supabase service-role credentials.
+- Operational writes remain server-side so the service role is never exposed to the browser.
 
 ## Product
 
-The console supports the five SIH modules plus a judge-friendly normal-operations-to-blizzard-lockdown scenario and offline queue/sync demonstration.
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The console supports expedition overview, voyage tracking, cargo telemetry, inventory, personnel safety, emergency cascades, assets, maps, field operations, audit reports, and scenario rehearsal.
 
 ## Gotchas
 
-- The prototype is intentionally self-contained; cloud persistence is documented but not required to explore the UI.
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Create an operator account from `/sign-up` or sign in from `/sign-in` before opening the operations modules.
+- Schema changes must be applied through the supported Supabase migration workflow; do not add runtime database bootstrap or a local database fallback.

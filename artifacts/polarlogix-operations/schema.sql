@@ -14,6 +14,7 @@ create table if not exists polar_stations (
   max_winter_capacity integer not null,
   current_occupancy integer not null default 0,
   is_edge_active boolean not null default true,
+  weather_summary varchar(120) not null default 'Conditions unavailable',
   created_at timestamptz not null default now()
 );
 
@@ -138,6 +139,33 @@ create table if not exists emergency_incidents (
   created_at timestamptz not null default now(),
   resolved_at timestamptz
 );
+
+create table if not exists operational_assets (
+  asset_id uuid primary key default uuid_generate_v4(),
+  asset_code varchar(50) unique not null,
+  asset_name varchar(150) not null,
+  asset_category varchar(30) not null
+    check (asset_category in ('VEHICLE', 'GENERATOR', 'SCIENCE INSTRUMENT', 'CONTAINER')),
+  asset_status varchar(30) not null
+    check (asset_status in ('READY', 'IN USE', 'MAINTENANCE DUE', 'GROUNDED', 'OFFLINE')),
+  location varchar(150) not null,
+  next_maintenance varchar(80) not null,
+  criticality varchar(1) not null check (criticality in ('V', 'E', 'D')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists operation_events (
+  event_id uuid primary key default uuid_generate_v4(),
+  event_time timestamptz not null default now(),
+  module varchar(40) not null,
+  action text not null,
+  tone varchar(12) not null default 'cyan',
+  user_name varchar(120),
+  justification text
+);
+
+create index if not exists idx_operation_events_time on operation_events (event_time desc);
 
 create index if not exists idx_stations_geom on polar_stations using gist (coordinates);
 create index if not exists idx_sorties_geom on field_sorties using gist (destination_area);

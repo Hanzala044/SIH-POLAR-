@@ -1,4 +1,6 @@
 export type Tone = 'cyan' | 'amber' | 'red' | 'slate' | 'green';
+export type AssetStatus = 'READY' | 'IN USE' | 'MAINTENANCE DUE' | 'GROUNDED' | 'OFFLINE';
+export type ScenarioKind = 'weather-degradation' | 'vessel-delay' | 'cargo-failure';
 export type Status =
   | 'ON STATION'
   | 'UNDERWAY'
@@ -73,6 +75,16 @@ export type Person = {
   status: 'INDOOR' | 'FIELD' | 'SOS';
 };
 
+export type Asset = {
+  id: string;
+  name: string;
+  category: 'VEHICLE' | 'GENERATOR' | 'SCIENCE INSTRUMENT' | 'CONTAINER';
+  status: AssetStatus;
+  location: string;
+  nextMaintenance: string;
+  criticality: 'V' | 'E' | 'D';
+};
+
 export type Emergency = {
   incidentId?: string;
   stationId?: string;
@@ -90,6 +102,8 @@ export type Event = {
   module: string;
   action: string;
   tone: Tone;
+  user?: string;
+  justification?: string;
 };
 
 export type OperationsSnapshot = {
@@ -98,6 +112,8 @@ export type OperationsSnapshot = {
   cargo: CargoItem[];
   inventory: InventoryItem[];
   personnel: Person[];
+  assets: Asset[];
+  events: Event[];
   emergency: Emergency;
 };
 
@@ -108,11 +124,3 @@ export type EmergencyPayload = {
   description: string;
   lockdown: boolean;
 };
-
-export type QueueOperation =
-  | { id: string; kind: 'voyage-create'; payload: Voyage }
-  | { id: string; kind: 'inventory-adjust'; payload: { sku: string; delta: number } }
-  | { id: string; kind: 'personnel-status'; payload: { id: string; status: Person['status'] } }
-  | { id: string; kind: 'cargo-anomaly'; payload: { cargo: CargoItem } }
-  | { id: string; kind: 'emergency-cascade'; payload: { emergency: EmergencyPayload; cargoIds: string[]; voyageIds: string[] } }
-  | { id: string; kind: 'emergency-resolve'; payload: { incidentId?: string } };

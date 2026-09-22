@@ -22,8 +22,21 @@ export type OperationsSnapshot = {
   inventory: Array<Record<string, unknown>>;
   personnel: Array<Record<string, unknown>>;
   assets: Array<Record<string, unknown>>;
+  trackingUnits: TrackingUnit[];
   events: Array<Record<string, unknown>>;
   emergency: Record<string, unknown>;
+};
+
+export type TrackingUnitKind = "VESSEL" | "TUG BOAT" | "HELICOPTER" | "UAV";
+export type TrackingUnit = {
+  id: string;
+  kind: TrackingUnitKind;
+  label: string;
+  latitude: number;
+  longitude: number;
+  status: string;
+  detail: string;
+  voyageId?: string;
 };
 
 const standbyEmergency = {
@@ -74,6 +87,18 @@ const seedEvents = [
   ["INVENTORY", "Generator lube oil threshold review", "amber"],
   ["WEATHER", "Blizzard watch · Maitri sector", "amber"],
 ] as const;
+
+const trackingUnits: TrackingUnit[] = [
+  { id: "VES-01", kind: "VESSEL", label: "MV Vasundhara", latitude: -58.5, longitude: 22, status: "UNDERWAY", detail: "NCPOR-44 · ice corridor to Maitri", voyageId: voyageIds.vasundhara, routeKey: "Cape Town → Maitri", progress: 0.42, speedKnots: 6, eta: "31 Jan · 14:00 UTC" },
+  { id: "VES-02", kind: "VESSEL", label: "MV Sagar Kanya", latitude: -49, longitude: 47, status: "READY", detail: "NCPOR-45 · Cape Town to Bharati", voyageId: voyageIds.sagar, routeKey: "Cape Town → Bharati", progress: 0.36, speedKnots: 0, eta: "08 Feb · 06:00 UTC" },
+  { id: "VES-03", kind: "VESSEL", label: "RV Polarstern II", latitude: 79.1, longitude: 13.1, status: "DELAYED", detail: "NCPOR-46 · Longyearbyen to Himadri", voyageId: voyageIds.polarstern, routeKey: "Longyearbyen → Himadri", progress: 0.54, speedKnots: 0, eta: "09 Feb · WEATHER HOLD" },
+  { id: "TUG-01", kind: "TUG BOAT", label: "NCPOR Tug Atlas", latitude: -59.6, longitude: 26.5, status: "ESCORTING", detail: "Supporting MV Vasundhara through the ice edge", routeKey: "Cape Town → Maitri", progress: 0.52, speedKnots: 4, eta: "ESCORT WINDOW · 04:20" },
+  { id: "TUG-02", kind: "TUG BOAT", label: "NCPOR Tug Meridian", latitude: -64.4, longitude: 35.2, status: "STANDBY", detail: "Ready for Southern Ocean transfer", routeKey: "Maitri → Southern Ocean", progress: 0.18, speedKnots: 0, eta: "ON-CALL · 12 MIN" },
+  { id: "TUG-03", kind: "TUG BOAT", label: "Harbour Tug Maitri", latitude: -70.4, longitude: 11.3, status: "ON STATION", detail: "Maitri coastal logistics and berth support", eta: "BERTH WATCH" },
+  { id: "HEL-01", kind: "HELICOPTER", label: "Dhruv H-01", latitude: -70.35, longitude: 12.6, status: "PATROL", detail: "Maitri west sector visibility patrol", routeKey: "Maitri → Southern Ocean", progress: 0.08, speedKnots: 24, eta: "PATROL LEG · 00:18" },
+  { id: "HEL-02", kind: "HELICOPTER", label: "Dhruv H-02", latitude: -69.05, longitude: 76.6, status: "READY", detail: "Bharati east traverse and medevac standby", eta: "LAUNCH READY" },
+  { id: "UAV-01", kind: "UAV", label: "Aurora UAV-01", latitude: 78.72, longitude: 12.2, status: "SURVEY", detail: "Himadri corridor ice reconnaissance", routeKey: "Longyearbyen → Himadri", progress: 0.62, speedKnots: 16, eta: "SURVEY LEG · 00:42" },
+];
 
 let readyPromise: Promise<void> | undefined;
 
@@ -290,6 +315,7 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
     coordinates: row.coordinates?.coordinates ? `${row.coordinates.coordinates[1]}°, ${row.coordinates.coordinates[0]}°` : "Coordinates unavailable",
   }));
   const stationNamesById = new Map(stations.map(station => [station.id, station.name]));
+  const voyageById = new Map((voyageResult.data || []).map(row => [row.voyage_id, row]));
   const voyages = (voyageResult.data || []).map(row => ({
     id: row.voyage_id,
     expedition: row.expedition_number,
@@ -310,6 +336,8 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
       tracking: row.tracking_number,
       description: row.cargo_description,
       destination: stationNamesById.get(row.destination_station_id) || "Unassigned",
+      origin: voyageById.get(row.voyage_id)?.departure_port || "India logistics hub",
+      voyageId: row.voyage_id,
       type: String(row.cargo_type).replaceAll("_", " ").replace(/\b\w/g, character => character.toUpperCase()),
       weight: numberOr(row.weight_kg),
       temperature: numberOr(telemetry?.temperature_celsius),
@@ -368,6 +396,7 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
     inventory,
     personnel,
     assets,
+    trackingUnits,
     events,
     emergency: latestIncident ? incidentToEmergency(latestIncident) : standbyEmergency,
   };

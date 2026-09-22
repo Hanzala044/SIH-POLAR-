@@ -6,10 +6,10 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { adjustInventory, createEmergencyCascade, createEvent, createVoyage, loadOperations, resolveEmergency, updateAssetStatus, updateCargoTelemetry, updatePersonnelStatus, updateVoyageStatus as updateVoyageStatusApi } from '@/lib/operations-api';
-import type { Asset, AssetStatus, CargoItem, Emergency, Event, InventoryItem, Person, ScenarioKind, Station, Status, Tone, Voyage } from '@/lib/operations-types';
+import type { Asset, AssetStatus, CargoItem, Emergency, Event, InventoryItem, Person, ScenarioKind, Station, Status, Tone, TrackingUnit, Voyage } from '@/lib/operations-types';
 import { Link, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import 'leaflet/dist/leaflet.css';
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import {
   Activity, AlertOctagon, AlertTriangle, Anchor, ArrowDownRight, ArrowUpRight, Boxes,
   CalendarDays, Check, ChevronRight, CircleDot, ClipboardList, CloudSnow, Container, Download,
@@ -25,15 +25,37 @@ import {
 
 type StateContext = {
   stations: Station[]; voyages: Voyage[]; cargo: CargoItem[]; inventory: InventoryItem[]; personnel: Person[];
-  assets: Asset[]; events: Event[]; emergency: Emergency; online: boolean; queued: number; realtimeConnected: boolean;
+  assets: Asset[]; trackingUnits: TrackingUnit[]; events: Event[]; emergency: Emergency; operatorRequests: OperatorRequest[]; online: boolean; queued: number; realtimeConnected: boolean;
   selectedVoyageId: string | null;
   loading: boolean;
   simulateBlizzard: () => void; clearIncident: () => void; simulateAnomaly: () => void;
   addVoyage: (v: Voyage) => void; adjustStock: (sku: string, delta: number) => void;
   setPersonStatus: (id: string, status: Person['status']) => void; setAssetStatus: (id: string, status: AssetStatus) => void;
   selectVoyage: (id: string | null) => void; updateVoyageStatus: (id: string, status: Status) => void;
+  reviewOperatorRequest: (id: string, decision: 'APPROVED' | 'REJECTED') => void;
   runScenario: (scenario: ScenarioKind) => void; exportAudit: () => void; toggleOnline: () => void;
 };
+
+type OperatorRequest = {
+  id: string;
+  operator: string;
+  role: string;
+  station: string;
+  stationCode: string;
+  request: string;
+  submitted: string;
+  priority: 'ROUTINE' | 'URGENT';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+};
+
+const operatorRequestSeed: OperatorRequest[] = [
+  { id: 'REQ-204', operator: 'Ananya Rao', role: 'Field Scientist', station: 'Bharati', stationCode: 'BHT', request: 'Access cargo telemetry and weather uplink', submitted: '08:42 UTC', priority: 'URGENT', status: 'PENDING' },
+  { id: 'REQ-203', operator: 'Vikram Singh', role: 'Station Commander', station: 'Maitri', stationCode: 'MAI', request: 'Approve vehicle sortie · LSV-03', submitted: '08:17 UTC', priority: 'ROUTINE', status: 'PENDING' },
+  { id: 'REQ-202', operator: 'Nisha Thomas', role: 'Science Lead', station: 'Himadri', stationCode: 'HMI', request: 'Authorize science equipment transfer', submitted: '07:56 UTC', priority: 'ROUTINE', status: 'PENDING' },
+  { id: 'REQ-201', operator: 'Rohan Iyer', role: 'Logistics Crew', station: 'Maitri', stationCode: 'MAI', request: 'Request temporary fuel inventory access', submitted: '07:31 UTC', priority: 'ROUTINE', status: 'PENDING' },
+];
+
+const operatorRequestDecisionsKey = 'polarlogix-operator-request-decisions';
 const StateCtx = createContext<StateContext | null>(null);
 const queryClient = new QueryClient();
 const clerkPubKey = publishableKeyFromHost(
@@ -111,8 +133,16 @@ function useOperations(): StateContext & { loading: boolean } {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [personnel, setPersonnel] = useState<Person[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [trackingUnits, setTrackingUnits] = useState<TrackingUnit[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [emergency, setEmergency] = useState<Emergency>({ type: 'No active incidents', severity: 'STANDBY', description: 'All stations operating within command parameters.', active: false, lockdown: false, timestamp: '—' });
+  const [operatorDecisions, setOperatorDecisions] = useState<Record<string, 'APPROVED' | 'REJECTED'>>(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(operatorRequestDecisionsKey) || '{}') as Record<string, 'APPROVED' | 'REJECTED'>;
+    } catch {
+      return {};
+    }
+  });
   const [online, setOnline] = useState(true);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
 
@@ -123,6 +153,7 @@ function useOperations(): StateContext & { loading: boolean } {
     setInventory(snapshot.inventory);
     setPersonnel(snapshot.personnel);
     setAssets(snapshot.assets);
+    setTrackingUnits(snapshot.trackingUnits || []);
     setEvents(snapshot.events);
     setEmergency(snapshot.emergency);
     setOnline(true);
@@ -207,8 +238,27 @@ function useOperations(): StateContext & { loading: boolean } {
   const toggleOnline = useCallback(() => {
     void refresh();
   }, [refresh]);
+  const operatorRequests = operatorRequestSeed.map(request => ({
+    ...request,
+    status: operatorDecisions[request.id] || request.status,
+  }));
+  const reviewOperatorRequest = useCallback((id: string, decision: 'APPROVED' | 'REJECTED') => {
+    const request = operatorRequestSeed.find(item => item.id === id);
+    if (!request) return;
+    setOperatorDecisions(previous => {
+      const next = { ...previous, [id]: decision };
+      window.localStorage.setItem(operatorRequestDecisionsKey, JSON.stringify(next));
+      return next;
+    });
+    void createEvent({
+      module: 'AUTHORITY',
+      action: `Operator access ${decision === 'APPROVED' ? 'approved' : 'rejected'} · ${request.operator} / ${request.station}`,
+      tone: decision === 'APPROVED' ? 'green' : 'red',
+      justification: `${request.request} · ${request.id}`,
+    }).then(() => refresh()).catch(error => console.error(error));
+  }, [refresh]);
 
-  return { stations: stationState, voyages, cargo, inventory, personnel, assets, events, emergency, online, queued: 0, realtimeConnected, selectedVoyageId, simulateBlizzard, clearIncident, simulateAnomaly, addVoyage, adjustStock, setPersonStatus, setAssetStatus, selectVoyage, updateVoyageStatus, runScenario, exportAudit, toggleOnline, loading };
+  return { stations: stationState, voyages, cargo, inventory, personnel, assets, trackingUnits, events, emergency, operatorRequests, online, queued: 0, realtimeConnected, selectedVoyageId, simulateBlizzard, clearIncident, simulateAnomaly, addVoyage, adjustStock, setPersonStatus, setAssetStatus, selectVoyage, updateVoyageStatus, reviewOperatorRequest, runScenario, exportAudit, toggleOnline, loading };
 }
 
 function Badge({ children, tone = 'slate' }: { children: ReactNode; tone?: Tone }) {
@@ -291,11 +341,49 @@ function AppShell({ children }: { children: ReactNode }) {
   return <div className="texture flex min-h-[100dvh] bg-[hsl(var(--background))]"><Sidebar /><div className="min-w-0 flex-1 md:ml-[252px]"><Header />{emergency.active && <div data-testid="status-global-alert" className="flex items-center gap-3 border-b border-red-700 bg-red-500 px-4 py-2 text-xs font-extrabold text-white md:px-7"><AlertOctagon size={16} className="shrink-0" /><span>CONDITION 1 LOCKDOWN · FIELD MOVEMENT SUSPENDED · MANDATORY MUSTER ACTIVE</span><Link href="/emergency" className="ml-auto underline">COMMAND CENTER</Link></div>}<main className="mx-auto max-w-[1600px] p-4 md:p-7">{loading ? <div className="space-y-5"><Skeleton className="h-10 w-72" /><div className="grid gap-4 md:grid-cols-4">{[1, 2, 3, 4].map(item => <Skeleton key={item} className="h-32" />)}</div><Skeleton className="h-80" /></div> : children}</main></div></div>;
 }
 
+function OperatorApprovalQueue() {
+  const { operatorRequests, reviewOperatorRequest } = useOps();
+  const pending = operatorRequests.filter(request => request.status === 'PENDING');
+  const decided = operatorRequests.filter(request => request.status !== 'PENDING');
+  return <section className="panel p-5 reveal">
+    <SectionTitle
+      eyebrow="COMMAND AUTHORITY / ACCESS CONTROL"
+      title="Operator approvals"
+      detail="Station requests stay pending until central command makes the decision."
+      action={<Badge tone={pending.length ? 'amber' : 'green'}><Radio size={11} />{pending.length} WAITING FOR APPROVAL</Badge>}
+    />
+    {pending.length ? <div className="grid gap-3 lg:grid-cols-2">{pending.map(request => <div key={request.id} data-testid={`card-operator-request-${request.id}`} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background)/.45)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-cyan-50 text-cyan-800"><Users size={18} /></div>
+          <div className="min-w-0"><div className="truncate text-sm font-extrabold">{request.operator}</div><div className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">{request.role}</div></div>
+        </div>
+        <Badge tone={request.priority === 'URGENT' ? 'red' : 'slate'}>{request.priority}</Badge>
+      </div>
+      <div className="mt-4 rounded-md bg-[hsl(var(--muted)/.55)] p-3">
+        <div className="mono text-[9px] font-bold tracking-[.16em] text-[hsl(var(--muted-foreground))]">REQUEST / {request.id}</div>
+        <div className="mt-1 text-xs font-bold leading-relaxed">{request.request}</div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]"><span className="inline-flex items-center gap-1"><MapPinned size={12} />{request.station} / {request.stationCode}</span><span>{request.submitted}</span></div>
+      </div>
+      <div className="mt-3 flex justify-end gap-2">
+        <Button data-testid={`button-reject-request-${request.id}`} variant="ghost" className="border border-red-200 text-red-700 hover:bg-red-50" onClick={() => reviewOperatorRequest(request.id, 'REJECTED')}><X size={14} />REJECT</Button>
+        <Button data-testid={`button-approve-request-${request.id}`} onClick={() => reviewOperatorRequest(request.id, 'APPROVED')}><Check size={14} />APPROVE</Button>
+      </div>
+    </div>)}</div> : <EmptyState title="No pending operator requests" detail="All station access requests have a recorded command decision." />}
+    {decided.length > 0 && <div className="mt-5 border-t border-[hsl(var(--border))] pt-4"><div className="mono text-[9px] font-bold tracking-[.16em] text-[hsl(var(--muted-foreground))]">RECENT COMMAND DECISIONS</div><div className="mt-2 flex flex-wrap gap-2">{decided.map(request => <Badge key={request.id} tone={request.status === 'APPROVED' ? 'green' : 'red'}><ShieldCheck size={10} />{request.operator} · {request.status}</Badge>)}</div></div>}
+  </section>;
+}
+
 function Overview() {
   const { stations: stationState, voyages, cargo, inventory, personnel, events, emergency, simulateBlizzard } = useOps();
   const field = personnel.filter(person => person.status === 'FIELD').length;
   const criticalCargo = cargo.filter(item => item.status === 'CRITICAL').length;
-  return <div className="space-y-6"><div className="reveal flex flex-wrap items-end justify-between gap-4"><div><div className="mono mb-2 text-[10px] font-bold tracking-[.2em] text-[hsl(var(--primary))]">COMMAND DECK / 00</div><h1 className="condensed text-5xl font-bold uppercase leading-[.86] tracking-wide md:text-6xl">Polar operations<br /><span className="text-[hsl(var(--primary))]">at a glance.</span></h1><p className="mt-3 max-w-xl text-sm text-[hsl(var(--muted-foreground))]">A trusted operational picture across three stations, two ice corridors, and the vessels moving between them.</p></div><Button data-testid="button-simulate-blizzard" variant={emergency.active ? 'secondary' : 'danger'} onClick={simulateBlizzard}>{emergency.active ? <LockKeyhole size={15} /> : <CloudSnow size={15} />}{emergency.active ? 'CONDITION 1 ACTIVE' : 'SIMULATE CONDITION 1'}</Button></div>{emergency.active && <div data-testid="status-active-cascade" className="reveal flex flex-wrap items-center justify-between gap-3 border-l-4 border-red-500 bg-red-50 px-4 py-3 text-red-900"><div className="flex items-center gap-3"><AlertOctagon size={20} /><div><div className="text-xs font-extrabold tracking-wide">EMERGENCY CASCADE PROPAGATED</div><div className="text-xs">Field sorties recalled · cargo handling paused · generator forecast +18%</div></div></div><Link href="/emergency" className="text-xs font-extrabold underline">OPEN COMMAND CENTER</Link></div>}<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{<Metric label="ACTIVE VOYAGES" value={String(voyages.filter(voyage => ['UNDERWAY', 'DELAYED'].includes(voyage.status)).length).padStart(2, '0')} detail="1 delayed in ice corridor" icon={Anchor} trend="up" />}{<Metric label="PERSONNEL ACCOUNTED" value={`${personnel.filter(person => person.status !== 'SOS').length}/${personnel.length}`} detail={`${field} currently in field`} icon={Users} tone={personnel.some(person => person.status === 'SOS') ? 'red' : 'green'} />}{<Metric label="CARGO EXCEPTIONS" value={String(criticalCargo).padStart(2, '0')} detail="1 cold-chain · 1 shock" icon={Container} tone={criticalCargo ? 'amber' : 'green'} />}{<Metric label="FUEL COVERAGE" value="21.4d" detail={emergency.active ? '18% burn uplift forecast' : 'at current burn rate'} icon={Zap} tone={emergency.active ? 'amber' : 'cyan'} trend="down" />}</div><div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]"><div className="panel p-5 reveal reveal-delay-1"><SectionTitle eyebrow="STATION PICTURE / LIVE" title="Theatre status" detail="Occupancy, weather, and readiness by node" action={<Link href="/personnel" className="text-xs font-bold text-[hsl(var(--primary))]">Muster detail <ChevronRight size={14} className="inline" /></Link>} /><div className="grid gap-3 sm:grid-cols-2">{stationState.map(station => <div key={station.code} data-testid={`card-station-${station.code.toLowerCase()}`} className="group rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background)/.45)] p-4 transition-colors hover:border-[hsl(var(--primary)/.45)]"><div className="flex items-start justify-between"><div><div className="mono text-[10px] font-bold tracking-[.15em] text-[hsl(var(--primary))]">{station.code} / {station.coordinates}</div><div className="mt-1 text-base font-extrabold">{station.name}</div></div><StatusBadge status={station.code === 'MAI' && emergency.active ? 'RECALLED' : 'ON STATION'} /></div><div className="mt-4 flex items-end justify-between"><div><div className="text-[11px] text-[hsl(var(--muted-foreground))]">{station.theatre}</div><div className="mt-1 flex items-center gap-2 text-xs font-bold"><CloudSnow size={13} />{station.weather}</div></div><div className="text-right"><div className="mono text-sm font-bold">{station.occupancy}<span className="text-[hsl(var(--muted-foreground))]">/{station.capacity}</span></div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">occupancy</div></div></div></div>)}</div></div><div className="panel p-5 reveal reveal-delay-2"><SectionTitle eyebrow="COMMAND LOG / UTC" title="Activity feed" action={<Activity size={18} className="text-[hsl(var(--primary))]" />} /><div className="space-y-1">{events.slice(0, 6).map(event => <div key={event.id} data-testid={`event-${event.id}`} className="flex gap-3 border-b border-[hsl(var(--border)/.75)] py-3 last:border-0"><div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${event.tone === 'red' ? 'bg-red-500' : event.tone === 'amber' ? 'bg-amber-400' : event.tone === 'green' ? 'bg-emerald-500' : 'bg-cyan-600'}`} /><div className="min-w-0"><div className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{event.time} · {event.module}</div><div className="mt-0.5 text-xs font-semibold leading-relaxed">{event.action}</div></div></div>)}</div></div></div></div>;
+  const coldChainLoads = cargo.filter(item => item.coldChain).length;
+  const shockWatch = cargo.filter(item => item.shock >= 1.5).length;
+  const fuelInventory = inventory.filter(item => item.category.includes('FUEL'));
+  const fuelDays = fuelInventory.reduce((total, item) => total + (item.dailyBurn ? item.quantity / item.dailyBurn : 0), 0);
+  const activeVoyages = voyages.filter(voyage => ['UNDERWAY', 'DELAYED'].includes(voyage.status)).length;
+  return <div className="space-y-6"><div className="reveal flex flex-wrap items-end justify-between gap-4"><div><div className="mono mb-2 text-[10px] font-bold tracking-[.2em] text-[hsl(var(--primary))]">COMMAND CENTRE / 00</div><h1 className="condensed text-5xl font-bold uppercase leading-[.86] tracking-wide md:text-6xl">Command centre<br /><span className="text-[hsl(var(--primary))]">at a glance.</span></h1><p className="mt-3 max-w-xl text-sm text-[hsl(var(--muted-foreground))]">Central authority for station access, expedition readiness, and the decisions that keep every operator moving safely.</p></div><Button data-testid="button-simulate-blizzard" variant={emergency.active ? 'secondary' : 'danger'} onClick={simulateBlizzard}>{emergency.active ? <LockKeyhole size={15} /> : <CloudSnow size={15} />}{emergency.active ? 'CONDITION 1 ACTIVE' : 'SIMULATE CONDITION 1'}</Button></div>{emergency.active && <div data-testid="status-active-cascade" className="reveal flex flex-wrap items-center justify-between gap-3 border-l-4 border-red-500 bg-red-50 px-4 py-3 text-red-900"><div className="flex items-center gap-3"><AlertOctagon size={20} /><div><div className="text-xs font-extrabold tracking-wide">EMERGENCY CASCADE PROPAGATED</div><div className="text-xs">Field sorties recalled · cargo handling paused · generator forecast +18%</div></div></div><Link href="/emergency" className="text-xs font-extrabold underline">OPEN COMMAND CENTER</Link></div>}<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{<Metric label="ACTIVE VOYAGES" value={String(activeVoyages).padStart(2, '0')} detail={`${voyages.filter(voyage => voyage.status === 'DELAYED').length} delayed in ice corridor`} icon={Anchor} trend="up" />}{<Metric label="PERSONNEL ACCOUNTED" value={`${personnel.filter(person => person.status !== 'SOS').length}/${personnel.length}`} detail={`${field} currently in field`} icon={Users} tone={personnel.some(person => person.status === 'SOS') ? 'red' : 'green'} />}{<Metric label="CARGO EXCEPTIONS" value={String(criticalCargo).padStart(2, '0')} detail={`${coldChainLoads} cold-chain · ${shockWatch} shock watch`} icon={Container} tone={criticalCargo ? 'amber' : 'green'} />}{<Metric label="FUEL COVERAGE" value={`${fuelDays.toFixed(1)}d`} detail={emergency.active ? '18% burn uplift forecast' : 'at current burn rate'} icon={Zap} tone={emergency.active ? 'amber' : 'cyan'} trend="down" />}</div><OperatorApprovalQueue /><div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]"><div className="panel p-5 reveal reveal-delay-1"><SectionTitle eyebrow="STATION PICTURE / LIVE" title="Theatre status" detail="Occupancy, weather, and readiness by node" action={<Link href="/personnel" className="text-xs font-bold text-[hsl(var(--primary))]">Muster detail <ChevronRight size={14} className="inline" /></Link>} /><div className="grid gap-3 sm:grid-cols-2">{stationState.map(station => <div key={station.code} data-testid={`card-station-${station.code.toLowerCase()}`} className="group rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background)/.45)] p-4 transition-colors hover:border-[hsl(var(--primary)/.45)]"><div className="flex items-start justify-between"><div><div className="mono text-[10px] font-bold tracking-[.15em] text-[hsl(var(--primary))]">{station.code} / {station.coordinates}</div><div className="mt-1 text-base font-extrabold">{station.name}</div></div><StatusBadge status={station.code === 'MAI' && emergency.active ? 'RECALLED' : 'ON STATION'} /></div><div className="mt-4 flex items-end justify-between"><div><div className="text-[11px] text-[hsl(var(--muted-foreground))]">{station.theatre}</div><div className="mt-1 flex items-center gap-2 text-xs font-bold"><CloudSnow size={13} />{station.weather}</div></div><div className="text-right"><div className="mono text-sm font-bold">{station.occupancy}<span className="text-[hsl(var(--muted-foreground))]">/{station.capacity}</span></div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">occupancy</div></div></div></div>)}</div></div><div className="panel p-5 reveal reveal-delay-2"><SectionTitle eyebrow="COMMAND LOG / UTC" title="Activity feed" action={<Activity size={18} className="text-[hsl(var(--primary))]" />} /><div className="space-y-1">{events.slice(0, 6).map(event => <div key={event.id} data-testid={`event-${event.id}`} className="flex gap-3 border-b border-[hsl(var(--border)/.75)] py-3 last:border-0"><div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${event.tone === 'red' ? 'bg-red-500' : event.tone === 'amber' ? 'bg-amber-400' : event.tone === 'green' ? 'bg-emerald-500' : 'bg-cyan-600'}`} /><div className="min-w-0"><div className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{event.time} · {event.module}</div><div className="mt-0.5 text-xs font-semibold leading-relaxed">{event.action}</div></div></div>)}</div></div></div></div>;
 }
 
 function VoyageDetailModal({ voyage, onClose }: { voyage: Voyage; onClose: () => void }) {
@@ -390,13 +478,21 @@ const leafletStationPoints: Record<string, [number, number]> = {
   MAI: [-70.75, 11.73],
   BHA: [-69.4, 76.18],
   HIM: [78.92, 11.93],
+  SEA: [-64.2, 41.13],
 };
 const leafletRoutes: Record<string, [number, number][]> = {
   'Cape Town → Maitri': [[-33.93, 18.42], [-43, 25], [-54, 27], [-64, 23], [-70.75, 11.73]],
   'Cape Town → Bharati': [[-33.93, 18.42], [-43, 35], [-54, 50], [-63, 64], [-69.4, 76.18]],
   'Longyearbyen → Himadri': [[78.22, 15.65], [79.2, 14], [79.3, 12.6], [78.92, 11.93]],
+  'Maitri → Southern Ocean': [[-70.75, 11.73], [-68, 18], [-64.2, 41.13]],
 };
-const leafletVesselPositions: [number, number][] = [[-58.5, 22], [-49, 47], [79.1, 13.1], [-61, 40], [-55, 53]];
+const indiaCargoRoutes = [
+  { id: 'IND-MAI', label: 'Chennai → Maitri', origin: 'Chennai, India', destination: 'Maitri', mode: 'SEA / PC-6', path: [[13.08, 80.27], [4, 72], [-14, 55], [-42, 32], [-70.75, 11.73]] as [number, number][], progress: 0.58, speedKnots: 6 },
+  { id: 'IND-BHA', label: 'Mumbai → Bharati', origin: 'Mumbai, India', destination: 'Bharati', mode: 'SEA / PC-5', path: [[19.07, 72.87], [7, 76], [-12, 78], [-39, 78], [-69.4, 76.18]] as [number, number][], progress: 0.34, speedKnots: 5 },
+  { id: 'IND-HIM', label: 'Kochi → Himadri', origin: 'Kochi, India', destination: 'Himadri', mode: 'AIR / SEA RELAY', path: [[9.93, 76.27], [20, 65], [40, 48], [65, 30], [78.92, 11.93]] as [number, number][], progress: 0.72, speedKnots: 14 },
+] as const;
+const leafletUnitColors: Record<TrackingUnit['kind'], string> = { VESSEL: '#f1b72e', 'TUG BOAT': '#087f8c', HELICOPTER: '#7c3aed', UAV: '#475569' };
+type LeafletCoordinate = [number, number];
 
 function LeafletViewport() {
   const map = useMap();
@@ -407,33 +503,109 @@ function LeafletViewport() {
   return null;
 }
 
+function positionAlongRoute(path: LeafletCoordinate[], progress: number): LeafletCoordinate {
+  if (path.length < 2) return path[0] || [0, 0];
+  const normalized = ((progress % 1) + 1) % 1;
+  const scaled = normalized * (path.length - 1);
+  const segment = Math.min(Math.floor(scaled), path.length - 2);
+  const ratio = scaled - segment;
+  const start = path[segment];
+  const end = path[segment + 1];
+  return [start[0] + (end[0] - start[0]) * ratio, start[1] + (end[1] - start[1]) * ratio];
+}
+
 function LiveLeafletMap({ expanded = false }: { expanded?: boolean }) {
-  const { stations: stationState, voyages, emergency, selectVoyage } = useOps();
-  return <div className={`relative overflow-hidden rounded-xl border border-cyan-900/20 shadow-inner ${expanded ? 'h-[560px]' : 'h-[360px]'}`}>
-    <MapContainer className="h-full w-full" center={[4, 22]} zoom={1} minZoom={1} maxZoom={5} scrollWheelZoom={expanded} worldCopyJump>
+  const { stations: stationState, voyages, cargo, trackingUnits, emergency, selectVoyage } = useOps();
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const [animationEpoch] = useState(() => Date.now());
+  const [now, setNow] = useState(animationEpoch);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 900);
+    return () => window.clearInterval(timer);
+  }, []);
+  const vessels = trackingUnits
+    .filter(unit => unit.kind === 'VESSEL')
+    .map(unit => ({ ...unit, status: voyages.find(voyage => voyage.id === unit.voyageId)?.status || unit.status }));
+  const supportUnits = trackingUnits.filter(unit => unit.kind !== 'VESSEL');
+  const selectedUnit = trackingUnits.find(unit => unit.id === selectedUnitId);
+  const selectedCargo = selectedUnit?.voyageId ? cargo.filter(item => item.voyageId === selectedUnit.voyageId) : [];
+  const movingPosition = (unit: TrackingUnit): LeafletCoordinate => {
+    const route = unit.routeKey ? leafletRoutes[unit.routeKey] : undefined;
+    if (!route || !unit.speedKnots) return [unit.latitude, unit.longitude];
+    const progress = (unit.progress || 0) + ((now - animationEpoch) / 720000) * unit.speedKnots;
+    return positionAlongRoute(route, progress);
+  };
+  const movingCargoPosition = (route: typeof indiaCargoRoutes[number]) => positionAlongRoute(route.path, route.progress + ((now - animationEpoch) / 720000) * route.speedKnots);
+  const cargoForRoute = (route: typeof indiaCargoRoutes[number]) => cargo.filter(item => item.destination === route.destination);
+  const openUnit = (unit: TrackingUnit) => {
+    setSelectedUnitId(unit.id);
+    if (unit.voyageId) selectVoyage(unit.voyageId);
+  };
+  return <div className="space-y-3">
+    <div className={`relative overflow-hidden rounded-xl border border-cyan-900/20 shadow-inner ${expanded ? 'h-[560px]' : 'h-[360px]'}`}>
+    <MapContainer className="h-full w-full" center={[4, 22]} zoom={1.2} minZoom={1} maxZoom={6} scrollWheelZoom={expanded} worldCopyJump zoomControl={false}>
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <ZoomControl position="bottomright" />
       <LeafletViewport />
-      {Object.entries(leafletRoutes).map(([route, path]) => <Polyline key={route} positions={path} pathOptions={{ color: emergency.active ? '#dc2626' : '#d5a52b', weight: 3, dashArray: '8 8', opacity: .9 }} />)}
+      {Object.entries(leafletRoutes).map(([route, path]) => <Polyline key={route} positions={path} pathOptions={{ color: emergency.active ? '#dc2626' : '#d5a52b', weight: 3, dashArray: '8 8', dashOffset: `${-Math.round(now / 40) % 32}px`, opacity: .9 }} />)}
+      {indiaCargoRoutes.map(route => <Polyline key={route.id} positions={route.path} pathOptions={{ color: emergency.active ? '#dc2626' : '#0e9aa7', weight: 2, dashArray: '3 9', dashOffset: `${-Math.round(now / 28) % 36}px`, opacity: .8 }} />)}
       {stationState.filter(station => leafletStationPoints[station.code]).map(station => <CircleMarker key={station.code} center={leafletStationPoints[station.code]} radius={9} pathOptions={{ color: '#fff', weight: 3, fillColor: station.code === 'MAI' && emergency.active ? '#dc2626' : '#087f8c', fillOpacity: 1 }}>
         <Popup><div className="leaflet-popup-card"><strong>{station.name} / {station.code}</strong><br />{station.theatre}<br />Occupancy: {station.occupancy}/{station.capacity}<br />{station.weather}</div></Popup>
       </CircleMarker>)}
-      {voyages.map((voyage, index) => <CircleMarker key={voyage.id} center={leafletVesselPositions[index % leafletVesselPositions.length]} radius={7} pathOptions={{ color: '#172236', weight: 2, fillColor: voyage.status === 'DELAYED' || emergency.active && index === 0 ? '#dc2626' : '#f1b72e', fillOpacity: 1 }} eventHandlers={{ click: () => selectVoyage(voyage.id) }}>
-        <Popup><div className="leaflet-popup-card"><strong>{voyage.vessel}</strong><br />{voyage.expedition} · {voyage.status}<br />{voyage.route}<br /><button className="leaflet-popup-link mt-2" onClick={() => selectVoyage(voyage.id)}>OPEN OPERATIONAL RECORD</button></div></Popup>
+      {indiaCargoRoutes.map(route => <CircleMarker key={`${route.id}-cargo`} center={movingCargoPosition(route)} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: '#0e9aa7', fillOpacity: 1 }}>
+        <Popup><div className="leaflet-popup-card"><strong>INDIA CARGO RUN</strong><br />{route.origin} → {route.destination}<br />{route.mode} · MOVING<div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]"><span>Loads</span><strong>{cargoForRoute(route).length}</strong><span>Speed</span><strong>{route.speedKnots} kn</strong><span>Tracking</span><strong>LIVE SIMULATION</strong></div><div className="mt-2 space-y-1 border-t border-slate-200 pt-2">{cargoForRoute(route).slice(0, 3).map(item => <div key={item.tracking} className="text-[10px]"><strong>{item.tracking}</strong> · {item.weight.toLocaleString()} kg · {item.type}</div>)}</div></div></Popup>
+      </CircleMarker>)}
+      {vessels.map((unit, index) => <CircleMarker key={unit.id} center={movingPosition(unit)} radius={selectedUnitId === unit.id ? 10 : 7} pathOptions={{ color: '#172236', weight: 2, fillColor: unit.status === 'DELAYED' || emergency.active && index === 0 ? '#dc2626' : leafletUnitColors.VESSEL, fillOpacity: 1 }} eventHandlers={{ click: () => openUnit(unit) }}>
+        <Popup><div className="leaflet-popup-card"><strong>{unit.label}</strong><br />VESSEL · {unit.status}<br />{unit.detail}<div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]"><span>Speed</span><strong>{unit.speedKnots ? `${unit.speedKnots} kn` : 'HOLD'}</strong><span>ETA</span><strong>{unit.eta || '—'}</strong><span>Route</span><strong>{unit.routeKey || 'Stationed'}</strong></div>{unit.voyageId && <button className="leaflet-popup-link mt-2" onClick={() => openUnit(unit)}>OPEN CARGO & VOYAGE RECORD</button>}</div></Popup>
+      </CircleMarker>)}
+      {supportUnits.map(unit => <CircleMarker key={unit.id} center={movingPosition(unit)} radius={selectedUnitId === unit.id ? 9 : unit.kind === 'HELICOPTER' ? 6 : unit.kind === 'UAV' ? 5 : 7} pathOptions={{ color: '#fff', weight: 2, fillColor: emergency.active && unit.kind === 'HELICOPTER' ? '#dc2626' : leafletUnitColors[unit.kind], fillOpacity: .95 }} eventHandlers={{ click: () => openUnit(unit) }}>
+        <Popup><div className="leaflet-popup-card"><strong>{unit.label}</strong><br />{unit.kind} · {unit.status}<br />{unit.detail}<div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]"><span>Speed</span><strong>{unit.speedKnots ? `${unit.speedKnots} kn` : 'HOLD'}</strong><span>ETA</span><strong>{unit.eta || '—'}</strong><span>Route</span><strong>{unit.routeKey || 'Stationed'}</strong></div><button className="leaflet-popup-link mt-2" onClick={() => openUnit(unit)}>OPEN UNIT RECORD</button></div></Popup>
       </CircleMarker>)}
     </MapContainer>
-    <div className="pointer-events-none absolute left-14 top-3 z-[500] rounded-md bg-white/90 px-3 py-2 shadow"><div className="mono text-[9px] font-extrabold tracking-[.15em] text-cyan-900">LEAFLET / LIVE CONTEXT</div><div className="mt-1 text-[10px] text-slate-600">Click a station or vessel for operational details.</div></div>
+    <div className="pointer-events-none absolute left-14 top-3 z-[500] rounded-md bg-white/90 px-3 py-2 shadow"><div className="mono text-[9px] font-extrabold tracking-[.15em] text-cyan-900">LEAFLET / MULTIMODAL TRACKING</div><div className="mt-1 text-[10px] text-slate-600">India cargo lanes, vessels, tug, and air units update live. Select any marker for particulars.</div></div>
+    <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-md bg-slate-950/85 px-3 py-2 text-[10px] font-bold text-white shadow"><span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 pulse-dot" />LIVE SIMULATION · POSITION UPDATES EVERY 0.9S</div>
+    </div>
+    {selectedUnit && <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 reveal">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><div className="mono text-[9px] font-bold tracking-[.16em] text-[hsl(var(--primary))]">TRACKING RECORD / {selectedUnit.id}</div><div className="mt-1 text-sm font-extrabold">{selectedUnit.label}</div><div className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{selectedUnit.kind} · {selectedUnit.detail}</div></div>
+        <div className="flex items-center gap-2"><Badge tone={selectedUnit.status === 'DELAYED' ? 'red' : selectedUnit.speedKnots ? 'green' : 'amber'}>{selectedUnit.speedKnots ? 'MOVING' : selectedUnit.status}</Badge><button aria-label="Close tracking record" onClick={() => setSelectedUnitId(null)} className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-[hsl(var(--muted))]"><X size={15} /></button></div>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-4"><div><div className="mono text-[9px] text-[hsl(var(--muted-foreground))]">CURRENT POSITION</div><div className="mt-1 text-xs font-bold">{movingPosition(selectedUnit).map(value => value.toFixed(2)).join('°, ')}°</div></div><div><div className="mono text-[9px] text-[hsl(var(--muted-foreground))]">SPEED</div><div className="mt-1 text-xs font-bold">{selectedUnit.speedKnots ? `${selectedUnit.speedKnots} knots` : 'Stationary / hold'}</div></div><div><div className="mono text-[9px] text-[hsl(var(--muted-foreground))]">ROUTE / ETA</div><div className="mt-1 text-xs font-bold">{selectedUnit.routeKey || 'Local station'} · {selectedUnit.eta || '—'}</div></div><div><div className="mono text-[9px] text-[hsl(var(--muted-foreground))]">MISSION LINK</div><div className="mt-1 text-xs font-bold">{selectedUnit.voyageId || 'Support fleet'}</div></div></div>
+      {selectedCargo.length > 0 && <div className="mt-4 border-t border-[hsl(var(--border))] pt-3"><div className="mono text-[9px] font-bold tracking-[.15em] text-[hsl(var(--primary))]">CARGO ONBOARD / {selectedCargo.length} LOADS</div><div className="mt-2 grid gap-2 md:grid-cols-2">{selectedCargo.map(item => <div key={item.tracking} className="rounded-md bg-[hsl(var(--muted)/.55)] p-3"><div className="flex items-start justify-between gap-2"><div className="text-xs font-extrabold">{item.tracking}</div><StatusBadge status={item.status} /></div><div className="mt-1 text-[11px]">{item.description}</div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[hsl(var(--muted-foreground))]"><span>{item.type}</span><span>{item.weight.toLocaleString()} kg</span><span>{item.origin || 'India logistics hub'} → {item.destination}</span>{item.coldChain && <span className="font-bold text-cyan-800">{item.temperature}°C cold-chain</span>}</div></div>)}</div></div>}
+    </div>}
   </div>;
 }
 
+function MapLegend({ emergency }: { emergency: boolean }) {
+  const items = [
+    { label: 'Station node', color: '#087f8c' },
+    { label: 'Vessel', color: '#f1b72e' },
+    { label: 'Tug boat', color: '#087f8c' },
+    { label: 'Helicopter', color: '#7c3aed' },
+    { label: 'UAV', color: '#475569' },
+    { label: 'India cargo lane', color: '#0e9aa7', dashed: true },
+    { label: emergency ? 'Restricted route' : 'Open route', color: emergency ? '#dc2626' : '#d5a52b', dashed: true },
+  ];
+  return <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-[hsl(var(--border))] pt-4">{items.map(item => <div key={item.label} className="flex items-center gap-2 text-[10px] font-bold text-[hsl(var(--muted-foreground))]"><span className={`h-3 w-3 rounded-full border-2 border-white shadow-sm ${item.dashed ? 'border-t-2 border-dashed bg-transparent' : ''}`} style={item.dashed ? { borderColor: item.color } : { backgroundColor: item.color }} />{item.label}</div>)}</div>;
+}
+
+function IndiaCargoLaneBoard({ cargo }: { cargo: CargoItem[] }) {
+  return <div className="panel p-5"><SectionTitle eyebrow="INDIA → POLAR BASES / CARGO NETWORK" title="Cargo lanes in motion" detail="Demonstration lanes from Indian logistics hubs to active polar bases; click a cyan marker on the map for load particulars." action={<Badge tone="cyan"><Radio size={11} />LIVE MOVEMENT</Badge>} /><div className="grid gap-3 lg:grid-cols-3">{indiaCargoRoutes.map(route => {
+    const loads = cargo.filter(item => item.destination === route.destination);
+    const weight = loads.reduce((total, item) => total + item.weight, 0);
+    return <div key={route.id} className="rounded-lg border border-cyan-200 bg-cyan-50/55 p-4"><div className="flex items-start justify-between gap-3"><div><div className="mono text-[9px] font-bold tracking-[.15em] text-cyan-800">{route.id} / CARGO CORRIDOR</div><div className="mt-1 text-sm font-extrabold">{route.origin} → {route.destination}</div></div><span className="h-3 w-3 rounded-full bg-cyan-600 pulse-dot" /></div><div className="mt-3 grid grid-cols-2 gap-2 text-[10px]"><div><div className="text-slate-500">MODE</div><strong>{route.mode}</strong></div><div><div className="text-slate-500">LOADS</div><strong>{loads.length} consignments</strong></div><div><div className="text-slate-500">WEIGHT</div><strong>{weight.toLocaleString()} kg</strong></div><div><div className="text-slate-500">STATE</div><strong className="text-cyan-800">IN TRANSIT</strong></div></div><div className="mt-3 border-t border-cyan-200 pt-2 text-[10px] text-slate-600">{loads.length ? loads.map(item => <div key={item.tracking} className="flex justify-between gap-2 py-0.5"><span className="font-bold">{item.tracking}</span><span>{item.type}</span></div>) : 'Awaiting manifest assignment'}</div></div>;
+  })}</div></div>;
+}
+
 function MapPage() {
-  const { stations, voyages, emergency } = useOps();
-  return <div className="space-y-6"><SectionTitle eyebrow="MAP & CORRIDORS / 07" title="Polar operating picture" detail="Leaflet map with station nodes, vessels, and controlled ice corridors" action={<Badge tone={emergency.active ? 'red' : 'green'}><MapPinned size={11} />{emergency.active ? 'CORRIDORS RESTRICTED' : 'CORRIDORS OPEN'}</Badge>} />
-    <div className="panel p-5"><LiveLeafletMap expanded /></div>
-    <div className="grid gap-4 md:grid-cols-3">{stations.slice(0, 3).map(station => <div key={station.code} className="panel p-4"><div className="mono text-[10px] font-bold tracking-[.15em] text-[hsl(var(--primary))]">{station.code} / {station.coordinates}</div><div className="mt-1 font-extrabold">{station.name}</div><div className="mt-2 flex justify-between text-xs"><span>{station.weather}</span><span className="mono">{station.occupancy}/{station.capacity}</span></div></div>)}</div></div>;
-  const positions = [{ code: 'HIM', x: 18, y: 20 }, { code: 'MAI', x: 47, y: 59 }, { code: 'BHA', x: 72, y: 70 }];
-  return <div className="space-y-6"><SectionTitle eyebrow="MAP & CORRIDORS / 07" title="Polar operating picture" detail="Station nodes, controlled ice corridors, and tracked mission paths" action={<Badge tone={emergency.active ? 'red' : 'green'}><MapPinned size={11} />{emergency.active ? 'CORRIDORS RESTRICTED' : 'CORRIDORS OPEN'}</Badge>} />
-    <div className="panel p-5"><div className="relative h-[460px] overflow-hidden rounded-xl border border-cyan-900/20 bg-[#dbe9e4]"><div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'linear-gradient(24deg, transparent 49%, rgba(17,94,89,.18) 50%, transparent 51%), linear-gradient(-18deg, transparent 49%, rgba(17,94,89,.12) 50%, transparent 51%)', backgroundSize: '95px 70px' }} /><div className="absolute left-[9%] top-[10%] text-[10px] font-extrabold tracking-[.2em] text-cyan-900/60">ARCTIC THEATRE</div><div className="absolute left-[34%] top-[88%] text-[10px] font-extrabold tracking-[.2em] text-cyan-900/60">ANTARCTIC OPERATING THEATRE</div>{positions.map(position => { const station = stations.find(item => item.code === position.code); return <div key={position.code} className="absolute" style={{ left: `${position.x}%`, top: `${position.y}%` }}><div className={`h-5 w-5 rounded-full border-4 border-white shadow ${station?.name === 'Maitri' && emergency.active ? 'bg-red-600' : 'bg-cyan-700'}`} /><div className="mt-1 rounded bg-white/85 px-2 py-1 shadow-sm"><div className="mono text-[9px] font-extrabold">{position.code}</div><div className="text-[9px] text-slate-600">{station?.occupancy || 0}/{station?.capacity || 0} occupied</div></div></div>; })}<div className={`absolute left-[50%] top-[48%] h-px w-[25%] rotate-[18deg] border-t-2 border-dashed ${emergency.active ? 'border-red-600' : 'border-amber-600'}`} /><div className={`absolute left-[30%] top-[61%] h-px w-[23%] -rotate-[12deg] border-t-2 border-dashed ${emergency.active ? 'border-red-600' : 'border-amber-600'}`} />{voyages.slice(0, 4).map((voyage, index) => <div key={voyage.id} className="absolute flex items-center gap-1 rounded-full bg-[hsl(var(--sidebar))] px-2 py-1 text-[9px] font-bold text-white shadow" style={{ left: `${22 + index * 17}%`, top: `${42 + (index % 2) * 18}%` }}><Anchor size={10} className="text-cyan-300" />{voyage.expedition} · {voyage.status}</div>)}</div></div>
-    <div className="grid gap-4 md:grid-cols-3">{stations.slice(0, 3).map(station => <div key={station.code} className="panel p-4"><div className="mono text-[10px] font-bold tracking-[.15em] text-[hsl(var(--primary))]">{station.code} / {station.coordinates}</div><div className="mt-1 font-extrabold">{station.name}</div><div className="mt-2 flex justify-between text-xs"><span>{station.weather}</span><span className="mono">{station.occupancy}/{station.capacity}</span></div></div>)}</div></div>;
+  const { stations, cargo, trackingUnits, emergency } = useOps();
+  const routeCount = Object.keys(leafletRoutes).length + indiaCargoRoutes.length;
+  const trackedUnits = trackingUnits.length;
+  return <div className="space-y-6"><SectionTitle eyebrow="MAP & CORRIDORS / 07" title="Multimodal operating picture" detail="India cargo lanes, polar stations, vessels, tug boats, helicopters, and aerial survey units" action={<Badge tone={emergency.active ? 'red' : 'green'}><MapPinned size={11} />{emergency.active ? 'CORRIDORS RESTRICTED' : 'CORRIDORS OPEN'}</Badge>} />
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="TRACKED UNITS" value={String(trackedUnits).padStart(2, '0')} detail="Vessels, support craft, and air" icon={RadioTower} tone="cyan" /><Metric label="STATIONS ONLINE" value={String(stations.length).padStart(2, '0')} detail="Polar nodes reporting" icon={MapPinned} tone="green" /><Metric label="ACTIVE CORRIDORS" value={String(routeCount).padStart(2, '0')} detail={emergency.active ? 'All routes under restriction' : 'Open route network'} icon={Anchor} tone={emergency.active ? 'red' : 'amber'} /><Metric label="CARGO LANES" value={String(indiaCargoRoutes.length).padStart(2, '0')} detail="India-to-base consignments" icon={PackageCheck} tone="cyan" /></div>
+    <div className="panel p-5"><LiveLeafletMap expanded /><div className="mt-4"><MapLegend emergency={emergency.active} /></div></div>
+    <IndiaCargoLaneBoard cargo={cargo} />
+    <div className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]"><div className="grid gap-4 sm:grid-cols-2">{stations.map(station => <div key={station.code} className="panel p-4"><div className="mono text-[10px] font-bold tracking-[.15em] text-[hsl(var(--primary))]">{station.code} / {station.coordinates}</div><div className="mt-1 flex items-center justify-between gap-3"><div className="font-extrabold">{station.name}</div><StatusBadge status={station.code === 'MAI' && emergency.active ? 'RECALLED' : 'ON STATION'} /></div><div className="mt-2 flex justify-between text-xs"><span>{station.weather}</span><span className="mono">{station.occupancy}/{station.capacity}</span></div></div>)}</div><div className="panel p-5"><SectionTitle eyebrow="SUPPORT FLEET / LIVE" title="Air & marine support" detail="Tracked units from the authenticated operations feed" /><div className="space-y-3">{trackingUnits.filter(unit => unit.kind !== 'VESSEL').map(unit => <div key={unit.id} className="flex items-center gap-3 border-b border-[hsl(var(--border)/.7)] pb-3 last:border-0 last:pb-0"><span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: leafletUnitColors[unit.kind] }} /><div className="min-w-0 flex-1"><div className="text-xs font-extrabold">{unit.label}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">{unit.kind} · {unit.detail}</div></div><Badge tone={unit.status === 'STANDBY' ? 'amber' : 'cyan'}>{unit.status}</Badge></div>)}</div></div></div></div>;
 }
 
 function FieldCompanion() {
@@ -470,9 +642,20 @@ function DemoRunbook() {
 function NotFound() { return <div className="panel mx-auto max-w-lg p-10 text-center"><AlertTriangle className="mx-auto text-amber-500" size={30} /><h1 className="condensed mt-4 text-4xl font-bold uppercase">Signal not found</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">This command channel does not exist.</p><Link href="/" className="mt-6 inline-flex min-h-10 items-center rounded-md bg-[hsl(var(--primary))] px-4 text-xs font-bold text-white">RETURN TO OVERVIEW</Link></div>; }
 
 function PublicLanding() {
+  const landingMetrics = [
+    { value: '04', label: 'STATION NODES', detail: 'Arctic + Antarctic theatres', icon: MapPinned },
+    { value: '03', label: 'ACTIVE VOYAGES', detail: 'Ice corridors under watch', icon: Anchor },
+    { value: '09', label: 'TRACKED UNITS', detail: 'Vessels, air, and support', icon: RadioTower },
+    { value: '24/7', label: 'COMMAND COVERAGE', detail: 'Decisions logged centrally', icon: ShieldCheck },
+  ];
+  const landingFeatures = [
+    { title: 'Central approvals', detail: 'Review operator requests by station and authorize access, sorties, and transfers.', icon: ShieldCheck, tone: 'bg-amber-100 text-amber-800' },
+    { title: 'Multimodal tracking', detail: 'See vessels, tug boats, helicopters, routes, and station nodes in one operating picture.', icon: MapPinned, tone: 'bg-cyan-100 text-cyan-800' },
+    { title: 'Readiness at a glance', detail: 'Monitor personnel, cargo exceptions, fuel coverage, and emergency state before acting.', icon: Activity, tone: 'bg-emerald-100 text-emerald-800' },
+  ];
   return <div className="grid min-h-[100dvh] place-items-center bg-[hsl(var(--sidebar))] px-5 py-10 text-white">
-    <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(135deg,#172236,#075b66)] shadow-2xl">
-      <div className="grid gap-10 p-7 md:grid-cols-[1.15fr_.85fr] md:p-12">
+    <div className="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(135deg,#172236,#075b66)] shadow-2xl">
+      <div className="grid gap-10 p-7 md:p-12 lg:grid-cols-[1.1fr_.9fr]">
         <div className="flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3">
@@ -481,19 +664,17 @@ function PublicLanding() {
             </div>
             <div className="mono mt-16 text-[10px] font-bold tracking-[.2em] text-cyan-200">SECURE COMMAND CONSOLE</div>
             <h1 className="condensed mt-3 max-w-xl text-6xl font-bold uppercase leading-[.85] tracking-wide md:text-8xl">Polar operations<br /><span className="text-[#f1b72e]">at a glance.</span></h1>
-            <p className="mt-6 max-w-xl text-sm leading-relaxed text-slate-200">Authenticated access to the expedition command picture, with every operational read and write persisted in your connected Supabase project.</p>
+            <p className="mt-6 max-w-xl text-sm leading-relaxed text-slate-200">One command picture for station approvals, expedition movement, personnel readiness, cargo safety, and emergency response across the polar theatre.</p>
           </div>
           <div className="mt-10 flex flex-wrap gap-3">
             <Link href="/sign-in" className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#f1b72e] px-5 text-xs font-extrabold tracking-wide text-[#172236] transition hover:bg-[#ffd56b]">SIGN IN TO COMMAND</Link>
             <Link href="/sign-up" className="inline-flex min-h-11 items-center justify-center rounded-md border border-white/30 px-5 text-xs font-extrabold tracking-wide text-white transition hover:bg-white/10">CREATE OPERATOR ACCOUNT</Link>
           </div>
         </div>
-        <div className="grid content-center gap-3">
-          {[
-            ['SUPABASE BACKED', 'Operational records stay in your connected cloud database.'],
-            ['SESSION PROTECTED', 'Only authenticated operators can reach the operations API.'],
-            ['LIVE SYNCHRONIZATION', 'The console refreshes the shared operational snapshot every 10 seconds.'],
-          ].map(([title, detail]) => <div key={title} className="rounded-xl border border-white/10 bg-white/10 p-5 backdrop-blur"><div className="mono text-[10px] font-bold tracking-[.16em] text-[#f1b72e]">{title}</div><div className="mt-2 text-sm leading-relaxed text-slate-200">{detail}</div></div>)}
+        <div className="space-y-4">
+          <div className="mono text-[10px] font-bold tracking-[.2em] text-[#f1b72e]">COMMAND PICTURE / AT A GLANCE</div>
+          <div className="grid grid-cols-2 gap-3">{landingMetrics.map(({ value, label, detail, icon: Icon }) => <div key={label} className="rounded-xl border border-white/10 bg-white/10 p-4 backdrop-blur"><div className="flex items-start justify-between"><div className="condensed text-3xl font-bold">{value}</div><Icon size={16} className="text-[#f1b72e]" /></div><div className="mono mt-2 text-[9px] font-bold tracking-[.13em] text-cyan-100">{label}</div><div className="mt-1 text-[10px] leading-relaxed text-slate-300">{detail}</div></div>)}</div>
+          <div className="space-y-2">{landingFeatures.map(({ title, detail, icon: Icon, tone }) => <div key={title} className="flex gap-3 rounded-xl border border-white/10 bg-[#092f3c]/45 p-4"><div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${tone}`}><Icon size={17} /></div><div><div className="text-xs font-extrabold">{title}</div><div className="mt-1 text-[11px] leading-relaxed text-slate-300">{detail}</div></div></div>)}</div>
         </div>
       </div>
     </div>

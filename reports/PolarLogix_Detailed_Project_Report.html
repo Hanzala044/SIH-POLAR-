@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>PolarLogix Operations — Detailed Project Report</title>
+<style>
+@page { size: A4; margin: 16mm 16mm 17mm; @bottom-left { content: "POLARLOGIX OPERATIONS  |  PROJECT REVIEW"; color: #64748b; font: 8pt Arial; } @bottom-right { content: "Page " counter(page) " of " counter(pages); color: #64748b; font: 8pt Arial; } }
+* { box-sizing: border-box; }
+body { margin: 0; color: #172435; font: 10pt/1.48 Arial, Helvetica, sans-serif; }
+.cover { min-height: 255mm; display:flex; flex-direction:column; justify-content:space-between; padding: 23mm 8mm 12mm; page-break-after:always; background:linear-gradient(145deg,#071a2c 0%,#0b344a 55%,#08636b 100%); color:white; }
+.brand { color:#f2bc32; font-weight:bold; letter-spacing:3px; font-size:11pt; }
+.kicker { color:#8de2df; font-size:9pt; letter-spacing:2px; font-weight:bold; text-transform:uppercase; margin-top:40mm; }
+.cover h1 { color:white; font-size:35pt; line-height:1.07; margin:8mm 0 7mm; max-width:165mm; }
+.cover .subtitle { color:#d9e8ed; font-size:15pt; max-width:150mm; }
+.cover .summary { border-left:3px solid #f2bc32; padding:4mm 6mm; margin-top:14mm; max-width:155mm; background:rgba(255,255,255,.07); color:#eef8fa; }
+.cover-meta { display:grid; grid-template-columns:1fr 1fr; gap:5mm; color:#d2e3e8; font-size:9pt; border-top:1px solid rgba(255,255,255,.3); padding-top:6mm; }
+.cover-meta strong { color:#ffffff; }
+h1,h2,h3,h4 { color:#0c3449; page-break-after:avoid; }
+h1 { font-size:24pt; margin:0 0 8mm; }
+h2 { font-size:16pt; margin:10mm 0 3mm; padding-bottom:2mm; border-bottom:2px solid #0d7e83; }
+h3 { font-size:12pt; margin:6mm 0 2mm; color:#0c5662; }
+h4 { font-size:10pt; margin:4mm 0 1mm; }
+p { margin:2mm 0 3mm; }
+li { margin:1.2mm 0; }
+ul,ol { padding-left:6mm; margin:2mm 0 4mm; }
+strong { color:#102f43; }
+a { color:#087d83; text-decoration:none; }
+.small { color:#566a7b; font-size:8.5pt; }
+.lead { font-size:12pt; color:#375164; }
+.callout { border-left:3px solid #0d8585; background:#eef7f7; padding:4mm 5mm; margin:4mm 0; }
+.warn { border-left-color:#db8c16; background:#fff7e9; }
+.risk { border-left-color:#c84c47; background:#fff0ef; }
+.good { border-left-color:#13875f; background:#edf8f1; }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:3mm; margin:3mm 0; }
+.card { border:1px solid #d5e0e6; border-radius:2mm; padding:3mm 4mm; background:#fbfdfe; }
+.card strong { display:block; color:#0c5662; margin-bottom:1mm; }
+table { width:100%; border-collapse:collapse; margin:3mm 0 5mm; font-size:8.8pt; page-break-inside:auto; }
+thead { display:table-header-group; }
+tr { page-break-inside:avoid; }
+th { background:#0d3448; color:white; text-align:left; padding:2.2mm; }
+td { border:1px solid #d8e2e8; padding:2.1mm; vertical-align:top; }
+tr:nth-child(even) td { background:#f5f9fa; }
+.tag { display:inline-block; padding:.5mm 1.5mm; border-radius:1mm; font-size:8pt; font-weight:bold; background:#e9f0f4; }
+.tag-live { background:#e6f5ed; color:#116044; }
+.tag-demo { background:#fff4da; color:#8a5b00; }
+.tag-schema { background:#efeafa; color:#5d428b; }
+.contents li { margin:1.4mm 0; }
+section { page-break-before:always; }
+section.no-break { page-break-before:auto; }
+.page-break { page-break-before:always; }
+.glossary dt { font-weight:bold; color:#0c5662; margin-top:2mm; }
+.glossary dd { margin:0 0 2mm 4mm; }
+.ref { font-size:8.5pt; color:#405569; }
+.footer-note { border-top:1px solid #d5e0e6; padding-top:3mm; color:#607181; font-size:8pt; margin-top:7mm; }
+code { font:9pt Consolas, monospace; color:#163d53; background:#f0f4f6; padding:.3mm 1mm; }
+</style></head><body>
+<div class="cover">
+ <div><div class="brand">POLARLOGIX <span style="color:white">/ OPERATIONS</span></div>
+ <div class="kicker">PRODUCT, TECHNICAL &amp; OPERATIONAL REVIEW</div>
+ <h1>Detailed Project Report</h1>
+ <div class="subtitle">How the application works, its workflows and technology, the real-world problem it addresses, and its feasibility and business potential.</div>
+ <div class="summary"><strong style="color:#f5c63d">Assessment at a glance</strong><br>PolarLogix is a credible operations-console prototype for coordinating polar expeditions, cargo, station sustainment, personnel and incidents. It is suitable for demonstrations and controlled shadow-mode evaluation, but should not yet be treated as an authoritative safety-critical command system. Several prominent live-looking displays are seeded, static or simulated.</div></div>
+ <div class="cover-meta"><div><strong>Prepared:</strong> 25 September 2026</div><div><strong>Product:</strong> PolarLogix Operations</div><div><strong>Review basis:</strong> Source code, routes, API and schema</div><div><strong>Audience:</strong> Product, engineering, operations and decision-makers</div></div>
+</div>
+
+<h1>Executive summary</h1>
+<p class="lead">PolarLogix Operations presents a single command-centre interface for a complex expedition supply chain: stations, voyages, cargo, inventory, people, field parties, equipment and emergency response.</p>
+<p>The strongest product idea is not a map by itself. It is <strong>exception coordination</strong>: show how an operational event affects related areas, record decisions, and help the team recover with a shared picture. The application has an authenticated web console, an API-backed snapshot and mutations, a Supabase persistence layer, and source-defined data models for the main domains. There is enough functionality for a compelling end-to-end prototype and a carefully bounded pilot.</p>
+<div class="callout warn"><strong>Operational-use boundary.</strong> “Live” wording does not consistently mean live telemetry. The map animates seeded positions; India cargo lanes are labeled demonstration lanes; several sensor, weather and readiness metrics are fixed display values; offline queue count is always zero; and browser polling is not a realtime transport. The application explicitly says “NO LIVE NAVIGATION CONTROL.” Use simulated information only for rehearsal until real data feeds, permissions, resilience and safety assurance have been validated.</div>
+<h3>Current readiness judgment</h3>
+<table><thead><tr><th>Dimension</th><th>Assessment</th><th>Reason</th></tr></thead><tbody>
+<tr><td>Product concept</td><td>Strong, coherent prototype</td><td>Connects expedition planning, cargo exceptions, stock runway, muster, equipment, emergency and reporting views.</td></tr>
+<tr><td>Technical feasibility</td><td>Feasible for a controlled pilot</td><td>React/Vite web client, Clerk-gated Express API, Supabase/PostgreSQL and a PostGIS-ready schema are present.</td></tr>
+<tr><td>Operational readiness</td><td>Not ready for authoritative polar operations</td><td>No verified sensor/vessel integration, true offline queue, complete role enforcement, field validation or safety case.</td></tr>
+<tr><td>Commercial viability</td><td>Plausible but unproven</td><td>Institutional buyers and a valuable coordination problem are plausible; there is no customer, procurement, pricing or outcome evidence in the repository.</td></tr>
+</tbody></table>
+<p><strong>Recommended next evaluation:</strong> a shadow-mode pilot focused on cargo chain of custody, cold-chain exception handling and station stock runway. Keep emergency and personnel outputs advisory until their procedures, authority and failure behavior are formally validated.</p>
+
+<section><h2>1. Scope and how to read this report</h2>
+<p>This report is based on a source review of the PolarLogix Operations frontend, API server, data types, Supabase schema, artifact configuration and product documentation. The route inventory covers the public landing and authentication screens, all authenticated modules, and the additional Demo Runbook route. The purpose is to explain the implementation as it exists, not to certify operational procedures or make claims about customer adoption.</p>
+<p>Evidence labels used in this report:</p>
+<div class="grid"><div class="card"><strong>Implemented / API-backed</strong>Authenticated API reads and mutations are in the application. Verify underlying record provenance and production configuration before treating it as authoritative.</div><div class="card"><strong>Static / seeded</strong>Values are hard-coded, seeded on empty data, or presented as sample metrics. They do not prove a live external source is connected.</div><div class="card"><strong>Simulated</strong>Movement or state is deliberately generated for demonstration or rehearsal. It must not be used for navigation or dispatch.</div><div class="card"><strong>Schema-only / not wired</strong>Database structures or infrastructure may exist, but no complete user-facing API path currently uses them.</div></div>
+<p>Source references appear in brackets such as [S1]. File and line references are listed in the Source register at the end. Line numbers refer to the reviewed workspace snapshot and can shift as the project changes.</p>
+</section>
+
+<section><h2>2. The real-world problem and proposed solution</h2>
+<h3>Problem</h3><p>Polar logistics combine long-distance transport with isolated stations, limited resupply windows, scarce fuel and life-support inventory, cold-sensitive cargo, weather restrictions, personnel accountability, specialized equipment and emergency response. In fragmented workflows, different teams may hold separate spreadsheets, sensor portals, radio logs and mission plans. A condition change can require multiple teams to reconcile those records quickly while connectivity is limited.</p>
+<h3>Proposed solution</h3><p>PolarLogix presents one cross-module operations picture. It aims to put expedition milestones, station occupancy and weather, cargo condition, inventory consumption, personnel state, assets, field parties and incident decisions in one console. Its emergency cascade concept shows a common incident alongside selected consequences in cargo, voyages, fuel forecast and field movement, with an event trail.</p>
+<h3>Who could use it</h3><table><thead><tr><th>Stakeholder</th><th>Potential job to be done</th><th>Relevant screens</th></tr></thead><tbody>
+<tr><td>Central expedition command / operations planners</td><td>Coordinate route windows, readiness, delays and cross-team decisions.</td><td>Overview, Expedition, Map, Emergency, Audit</td></tr>
+<tr><td>Station commanders / logistics officers</td><td>Check occupancy, weather, incoming stores, sustainment runway and local constraints.</td><td>Overview, Cargo, Inventory, Assets</td></tr>
+<tr><td>Cargo, warehouse and reefer teams</td><td>Find consignments, spot temperature/shock exceptions and document disposition.</td><td>Cargo, Map, Audit</td></tr>
+<tr><td>Safety, medical and field coordinators</td><td>Account for people and monitor field/SOS states and movement restrictions.</td><td>Personnel, Field, Emergency</td></tr>
+<tr><td>Fleet and maintenance teams</td><td>See readiness and maintenance flags for vehicles, generators and equipment.</td><td>Assets, Expedition, Map</td></tr>
+<tr><td>Incident reviewers / auditors</td><td>Reconstruct recorded actions and export a review file.</td><td>Audit &amp; Reports</td></tr>
+</tbody></table>
+<div class="callout"><strong>Value proposition to validate:</strong> “Give polar command one decision-ready picture of people, supplies, movement and risk, then make the impact and record of an incident visible across the operation.” This is a product hypothesis, not a demonstrated outcome.</div>
+</section>
+
+<section><h2>3. Application pages and features</h2>
+<p>The authenticated shell exposes eleven primary modules. A twelfth route, <code>/runbook</code>, provides a guided rehearsal but is not one of the main sidebar modules. Unknown paths show a “Signal not found” screen. Mobile navigation opens the same main modules in abbreviated form. The signed-in shell includes operator identity, sign-out, UTC clock, station summary and a refresh/network indicator.</p>
+<h3>3.1 Public landing and access</h3><p><strong>Routes:</strong> <code>/</code> when signed out, <code>/sign-in</code>, <code>/sign-up</code>. The branded landing page describes a “Secure Command Console,” displays static at-a-glance counts (04 station nodes, 03 voyages, 09 tracked units, 24/7 coverage), and explains central approvals, multimodal tracking and readiness at a glance. Users can choose Sign in to Command or Create Operator Account. Clerk provides the authentication screens. These landing-page counts are presentation content, not a live operational snapshot.</p>
+<h3>3.2 Operations overview — Command centre at a glance (<code>/</code>)</h3><ul>
+<li><strong>SIMULATE CONDITION 1:</strong> invokes the blizzard/emergency cascade. When active, it becomes a Condition 1 Active state; the page displays a cascade-propagated alert and links to Emergency Command.</li>
+<li><strong>Active Voyages:</strong> counts voyages in UNDERWAY or DELAYED states; includes a delayed-voyage detail.</li>
+<li><strong>Personnel Accounted:</strong> counts non-SOS people out of the roster total; shows field count.</li>
+<li><strong>Cargo Exceptions:</strong> counts CRITICAL cargo and surfaces cold-chain and shock-watch information. Shock watch uses a threshold of 1.5 g.</li>
+<li><strong>Fuel Coverage:</strong> estimates fuel days as quantity divided by daily burn; the display applies an 18% emergency uplift.</li>
+<li><strong>Theatre status:</strong> station cards show code, coordinates, theatre, weather, occupancy/capacity and operational status. A Personnel link opens muster details.</li>
+<li><strong>Activity feed:</strong> shows a small recent-event subset with UTC time, module, action and color tone.</li>
+<li><strong>Operator approvals:</strong> shows seeded requests with operator, role, priority, request ID, request text, station and submit time. Approve/Reject records a local browser decision and emits an AUTHORITY event. The decision itself is not a durable server-side authorization record, so it is not a reliable access-control workflow.</li>
+</ul>
+<h3>3.3 Expedition control — Voyage planning (<code>/expedition</code>)</h3><ul>
+<li>Headline cards show next ice entry, fleet readiness and path risk. These include fixed demonstration values.</li>
+<li>The ice-corridor timeline shows port departure, Southern Ocean, ice entry, station offload and return window; badges are <em>complete</em>, <em>active</em> and <em>next</em>.</li>
+<li>Voyage rows show expedition ID, vessel, polar-class label, route, departure, ice-entry estimate, status and delay. <strong>OPEN</strong> shows a voyage record, navigation-state text, destination/logistics cell and weather-watch summary.</li>
+<li><strong>MARK READY / RELEASE UNDERWAY / HOLD or DELAY</strong> changes voyage status through the API and refreshes the view.</li>
+<li><strong>CREATE VOYAGE</strong> opens a mission builder with vessel, destination and departure-window fields. Saving creates a plan record with a generated expedition identifier and derived route/class values. Some fields (such as entry timing) are currently fixed/defaulted rather than calculated by a route-optimization engine.</li>
+</ul>
+<h3>3.4 Cargo telemetry — Cold-chain and stowage (<code>/cargo</code>)</h3><ul>
+<li><strong>SIMULATE ANOMALY</strong> writes a critical temperature anomaly for sample tracking ID PLX-804-19, then refreshes the snapshot.</li>
+<li>Summary cards show container counts, cold-chain pass percentage, total mass and LIVE SENSORS/heartbeat. These are fixed display/demo metrics, not proof of an attached sensor fleet.</li>
+<li>The temperature trace displays a sample sensor series and a tolerance band of −20°C to −12°C. Its plotted points are static.</li>
+<li>The container grid presents Bay 03, Maitri inbound and a locked crane sequence as sample stowage context.</li>
+<li>Search filters telemetry rows by tracking ID, description or destination. Row fields include tracking, description, cargo type/weight, destination, temperature °C, shock g and state. The visible legend uses NORMAL (cyan), HOLD (amber) and EXCEPTION (red); the underlying API commonly represents the critical state as CRITICAL.</li>
+</ul>
+<h3>3.5 Inventory and burn — Sustainment picture (<code>/inventory</code>)</h3><ul>
+<li>Cards display critical-stock count, fuel runway in days and combined water/oxygen life-support coverage. Emergency mode shows an 18% burn uplift and a lower runway.</li>
+<li>The fuel runway chart projects litres remaining at D0/D4/D8/D12/D16/D20. Generator, aviation and water-treatment draw rates are shown in L/day. These projection curves/draw assumptions are presentation/demo profiles, not forecasts derived from a full demand model.</li>
+<li>The VED register shows item name/SKU/category/station, on-hand quantity and unit, daily burn, threshold and a visual bar. A row’s − / + controls apply a −10 / +10 adjustment via the API and create an inventory event.</li>
+</ul>
+<h3>3.6 Personnel readiness — Muster and field safety (<code>/personnel</code>)</h3><ul>
+<li>Cards count accounted people, active field personnel and a readiness index.</li>
+<li>Roster entries display person, role, station/phase, medical, training, blood group and operating state.</li>
+<li><strong>INDOOR, FIELD, SOS</strong> update a person’s status through the API and add an event. The UI explains Indoor/Station as sheltered and accounted; Field/Beacon as active work parties; SOS/Response as immediate response required.</li>
+<li><strong>RECONCILE MUSTER</strong> currently shows a confirmation alert; it does not reconcile an external roster or beacon feed.</li>
+</ul>
+<h3>3.7 Emergency command — Command the cascade (<code>/emergency</code>)</h3><ul>
+<li><strong>TRIGGER CONDITION 1</strong> invokes a seeded Maitri blizzard incident with severity LEVEL_3_LIFE_THREATENING, type BLIZZARD_COND_1 and lockdown enabled. The visible alert describes field movement suspension.</li>
+<li>The application updates incident state and selected cargo/voyage records, displays personnel movement as recalled, cargo handling paused, generator forecast elevated by 18%, and milestones pushed. The screen is a cross-module response summary, not a complete automation of all field SOPs.</li>
+<li><strong>DECLARE RECOVERY</strong> resolves the active incident. Recovery does not guarantee that every secondary data change is rolled back.</li>
+<li>A weather card shows a sample whiteout, visibility under 120 m and wind at 42 kt. The event log lists recorded cascade events. The phrase “badge readers require command release” is interface copy; no badge-reader integration is evidenced.</li>
+<li>A lockdown control performs the same trigger/recovery path. Active state changes the global warning banner and disables/restricts selected actions.</li>
+</ul>
+<h3>3.8 Asset management — Fleet and equipment (<code>/assets</code>)</h3><ul>
+<li>Groups assets by VEHICLE, GENERATOR, SCIENCE INSTRUMENT and CONTAINER. Cards summarize registered assets, items in use and maintenance due.</li>
+<li>Rows show ID, name, V/E/D mission criticality, location, status and next-service text. <strong>OPEN RECORD</strong> shows a detail modal, readiness check and movement restriction.</li>
+<li>Asset controls mark an item IN USE, return it to READY or clear a service flag. Vehicle movement is disabled during emergency state.</li>
+<li>The “3D asset profile” is a decorative CSS visual, not a 3D model, digital twin or live equipment connection.</li>
+</ul>
+<h3>3.9 Map and corridors — Multimodal operating picture (<code>/map</code>)</h3><ul>
+<li>An interactive Leaflet map shows station nodes, vessels, tugs, helicopters, UAVs, routes and cargo lanes. Marker popups can open unit/cargo/voyage records.</li>
+<li>Legend: teal dot station; yellow dot vessel; teal dot tug boat; purple dot helicopter; slate dot UAV; cyan dashed India lane; yellow dashed open route; red dashed restricted route.</li>
+<li>Unit records show current position, speed in knots, route/ETA, mission link and cargo manifest particulars. India-lane popups show origin/destination, mode, loads, speed, “MOVING,” and explicitly “LIVE SIMULATION.”</li>
+<li>Demonstration lanes are Chennai→Maitri (SEA / PC-6), Mumbai→Bharati (SEA / PC-5), and Kochi→Himadri (AIR / SEA RELAY). Movement is generated locally from fixed route points, progress and speed parameters; it is not GPS/AIS/ADS-B or vessel-provider telemetry. Animation updates on a 900 ms UI timer.</li>
+<li>OpenStreetMap tiles provide the visual map. “Corridors open/restricted” summarizes application state; it is not navigational authorization. The page explicitly presents the India lanes as demonstration lanes.</li>
+</ul>
+<h3>3.10 Field companion — Work-party console (<code>/field</code>)</h3><ul>
+<li>Shows a beacon/sortie status badge, field-active count, a next check-in card and visibility summary. Values such as next check-in 06:15 and visibility 8.4 km / under 120 m are sample display values.</li>
+<li>Lists person, role, station, blood group and state. Controls set a person Sheltered/Indoor, Field or SOS. Field can be disabled during emergency.</li>
+<li>During an active incident it displays Field Movement Suspended and instructs return to shelter and beacon confirmation. The schema contains field-sortie concepts, but the current screen changes person status; it is not an end-to-end beacon or sortie dispatch system.</li>
+</ul>
+<h3>3.11 Audit and reports — Decision record (<code>/audit</code>)</h3><ul>
+<li>Lists UTC, module, command and justification. When justification is missing, the UI shows a default phrase.</li>
+<li><strong>EXPORT CSV</strong> creates a client-generated CSV from currently loaded events. <strong>PRINT / PDF</strong> calls the browser print dialog; it is not a server-generated, immutable report.</li>
+<li>“AUDIT APPEND-ONLY” is a UI label. Event rows are persisted by API, but database immutability controls and complete actor/authorization attribution need verification before treating the records as legally tamper-proof.</li>
+</ul>
+<h3>3.12 Scenario planner — Test the cascade (<code>/scenarios</code>)</h3><ul>
+<li>Three cards: Weather degradation (Maitri whiteout), Vessel delay (shift a voyage by one day), and Cargo telemetry failure (inject a cold-chain exception).</li>
+<li>Controls run the selected scenario and, when active, declare recovery. The page labels itself LOCAL SIMULATION, STATE IS REVERSIBLE and NO LIVE NAVIGATION CONTROL.</li>
+<li>Important behavior distinction: scenario actions call API mutations and can alter persisted records; “local simulation” describes the scenario framing, not a guaranteed throwaway sandbox. Use only with designated demo/test data.</li>
+</ul>
+<h3>3.13 Demo Runbook — Operations rehearsal (<code>/runbook</code>)</h3><p>Four clickable steps guide a rehearsal: Establish picture (overview/station status/log), Detect anomaly (cargo failure or vessel delay), Execute cascade (weather/emergency), and Recover &amp; report (resolve and export audit). “OPEN MODULE” navigates to the corresponding operational area. This is a walkthrough, not an independent workflow engine.</p>
+</section>
+
+<section><h2>4. End-to-end project workflows</h2>
+<h3>4.1 Normal operations review</h3><ol><li>Operator signs in through Clerk.</li><li>The client requests the authenticated operations snapshot.</li><li>The API reads operational rows from Supabase and maps them into the client’s common snapshot shape.</li><li>Operator reviews station, voyage, cargo, inventory, personnel and asset status across modules.</li><li>The browser polls again every 10 seconds; successful snapshot loading is presented as SYNCED/LIVE OPERATIONS FEED.</li></ol>
+<h3>4.2 Voyage planning and status control</h3><ol><li>Review the voyage list and timeline.</li><li>Open an existing voyage to inspect route/status/ETA details.</li><li>Mark ready, release underway, or hold/delay; each action updates the voyage through the API.</li><li>Optionally create a plan by choosing a vessel, destination and departure window.</li><li>Snapshot refresh makes the updated state visible. Route timing and some plan fields remain seeded/defaulted rather than computed from external conditions.</li></ol>
+<h3>4.3 Cargo exception handling</h3><ol><li>Search for a cargo tracking number or destination.</li><li>Review temperature, shock, destination and status.</li><li>Use the simulation control in demo mode to append a sample anomaly, or receive an API-backed anomaly record.</li><li>Review the new state and related event after the refreshed snapshot.</li><li>Real-world use would additionally need a sensor source, raw readings, calibration, chain-of-custody, triage and approved disposition.</li></ol>
+<h3>4.4 Emergency cascade and recovery</h3><ol><li>Declare Condition 1 / trigger the seeded blizzard incident.</li><li>The API records the incident and updates selected related data (including targeted voyage/cargo changes).</li><li>The overview banner and Emergency screen communicate restricted movement, paused handling, forecast uplift and milestone impact.</li><li>Operators use the event log to review changes, then explicitly declare recovery.</li><li>Recovery resolves incident state; it is not an atomic rollback of all secondary changes. Multi-write failures could leave partial effects.</li></ol>
+<h3>4.5 Inventory adjustment and runway</h3><ol><li>Review on-hand, daily burn and threshold.</li><li>Adjust stock in fixed increments of ten units.</li><li>The API writes the quantity update and a corresponding operation event.</li><li>The client refreshes; the runway display estimates coverage from quantity and burn profiles. This is not a complete procurement or demand-planning process.</li></ol>
+<h3>4.6 Muster, field state and audit</h3><ol><li>Review roster and station assignment.</li><li>Set each person to INDOOR, FIELD or SOS as applicable.</li><li>Emergency state can restrict field action and raise a global banner.</li><li>Changes create operation events visible to authorized users through the snapshot.</li><li>Export currently loaded events to CSV or open print/PDF from the browser.</li></ol>
+</section>
+
+<section><h2>5. Technical architecture and data flow</h2>
+<h3>5.1 Technology stack</h3><table><thead><tr><th>Layer</th><th>Technology</th><th>Role in this project</th></tr></thead><tbody>
+<tr><td>Workspace</td><td>pnpm monorepo, Node.js 24, TypeScript 5.9</td><td>Shared packages and separate frontend/API artifacts; typecheck and build scripts.</td></tr>
+<tr><td>Web client</td><td>React 19, Vite 7, Tailwind CSS 4, Radix/shadcn-style UI</td><td>Authenticated command console, responsive navigation and module screens.</td></tr>
+<tr><td>Routing/state</td><td>Wouter, React state/context; TanStack Query dependency present</td><td>Path-based screens and shared snapshot state. The active operations flow uses polling and local React state; Query APIs are not the main data mechanism.</td></tr>
+<tr><td>Maps/charts/motion</td><td>Leaflet + react-leaflet, Recharts, Framer Motion</td><td>Map presentation, charts and interface animation; route movement is simulated.</td></tr>
+<tr><td>Identity</td><td>Clerk React and Clerk Express</td><td>Sign-in/sign-up and authenticated API boundary.</td></tr>
+<tr><td>API</td><td>Node.js, Express 5, CORS, pino/pino-http, esbuild</td><td>HTTP endpoints, server-side operations logic and logging.</td></tr>
+<tr><td>Persistence</td><td>Supabase JavaScript client over PostgreSQL; schema includes PostGIS</td><td>Server-owned reads/writes for operational records and spatial-ready schema.</td></tr>
+<tr><td>Hosting</td><td>Replit artifact workflows/deployment</td><td>Web artifact and API service run as separately configured services; the web is served as a static SPA in deployment.</td></tr>
+</tbody></table>
+<h3>5.2 Request and persistence path</h3><div class="callout"><strong>Browser → API → Supabase → API response → browser.</strong> Clerk renders the access flow. After authentication the client fetches <code>/api/operations</code>. The Express API checks for a Clerk user, uses a server-only Supabase service-role client to load/map the snapshot, and returns domain data. User actions call operations endpoints; server code writes to Supabase; the frontend refreshes after the mutation.</div>
+<p>The API supports <code>GET /api/healthz</code>; <code>GET /api/operations</code>; <code>POST /api/operations/voyages</code>; <code>PATCH /api/operations/voyages/:id/status</code>; <code>POST /api/operations/inventory/adjust</code>; <code>PATCH /api/operations/personnel/:id/status</code>; <code>PATCH /api/operations/assets/:id/status</code>; <code>POST /api/operations/cargo/anomaly</code>; <code>POST /api/operations/emergency/cascade</code>; <code>POST /api/operations/emergency/resolve</code>; <code>POST /api/operations/events</code>; and <code>POST /api/operations/initialize</code>. Health check only confirms the server responds; it does not validate database reachability or authentication.</p>
+<h3>5.3 Main schema entities</h3><table><thead><tr><th>Entity/table</th><th>Purpose</th><th>Implementation note</th></tr></thead><tbody>
+<tr><td>polar_stations</td><td>Station identity, location, capacity, weather summary</td><td>Used in operations snapshot.</td></tr><tr><td>expedition_voyages</td><td>Expedition/vessel route and status</td><td>Read and mutated by voyage workflows.</td></tr><tr><td>cargo_manifest</td><td>Consignments, destination, cold-chain and status attributes</td><td>Joined to telemetry and voyages as available.</td></tr><tr><td>cargo_telemetry</td><td>Temperature/humidity/shock readings</td><td>API can append anomaly/telemetry records; real sensor ingestion is not shown.</td></tr><tr><td>inventory_items</td><td>Stock on hand, unit, burn, threshold and priority</td><td>Adjustment endpoint exists; forecasts are simplified.</td></tr><tr><td>expedition_personnel</td><td>Roster and readiness/status attributes</td><td>Status changes are API-backed.</td></tr><tr><td>field_sorties</td><td>Sortie/work-party and spatial planning fields</td><td>Schema-only in the reviewed implementation; no complete API/UI lifecycle.</td></tr><tr><td>emergency_incidents</td><td>Incident status, severity and operational response</td><td>Cascade and resolve paths are present; real-world SOP equivalence is unverified.</td></tr><tr><td>operational_assets</td><td>Vehicle, generator, instrument and container state</td><td>API-backed asset status flow exists.</td></tr><tr><td>operation_events</td><td>Recorded command/action timeline</td><td>API writes events; client export uses currently loaded event rows.</td></tr></tbody></table>
+<h3>5.4 What is truly live, simulated or incomplete?</h3><table><thead><tr><th>Capability</th><th>Classification</th><th>What the code currently does</th></tr></thead><tbody>
+<tr><td>Authenticated console and API snapshot</td><td>Implemented</td><td>Clerk identity and API snapshot; snapshot refresh every 10 seconds.</td></tr><tr><td>Voyage, stock, personnel and asset mutations</td><td>API-backed</td><td>Server writes selected state changes to Supabase and returns updated snapshot.</td></tr><tr><td>Emergency and anomaly controls</td><td>API-backed demo actions</td><td>Button-driven cascades and anomalies may affect stored demo records.</td></tr><tr><td>Vessel/support-unit positions</td><td>Simulated</td><td>Seeded tracking-unit records move along hard-coded routes in the browser.</td></tr><tr><td>India cargo-lane motion</td><td>Demonstration</td><td>Fixed lane geometries with client-side progress; explicitly labeled simulation.</td></tr><tr><td>Sensor counts, traces, select weather/readiness values</td><td>Static/sample display</td><td>Hard-coded headline values and chart points; not sourced from field hardware.</td></tr><tr><td>Realtime connection</td><td>Not implemented</td><td>HTTP polling is used; no active browser WebSocket/SSE/Supabase subscription.</td></tr><tr><td>Offline mode/store-and-forward</td><td>Not implemented</td><td>Queue count is hardcoded to zero; network control refreshes rather than toggling connectivity.</td></tr><tr><td>Approvals</td><td>Local prototype</td><td>Seeded approval items and decisions in browser localStorage; not durable, role-enforced authorization.</td></tr><tr><td>Field sorties, beacon/radio feeds</td><td>Schema-only / not integrated</td><td>Field screen updates personnel state; it does not manage actual sorties or ingest beacon/radio data.</td></tr></tbody></table>
+</section>
+
+<section><h2>6. Feasibility, viability and business model</h2>
+<h3>6.1 Technical feasibility</h3><p><strong>Feasible as a controlled pilot:</strong> the code already separates browser, API and database responsibilities, and the schema has domain entities for cargo, inventory, incidents, people, assets and spatial data. A real pilot can build on these components instead of starting over.</p><p><strong>Not ready as safety-critical infrastructure:</strong> authoritative movement/sensor feeds, true offline operation, robust data freshness, permissions, recoverable transaction behavior, field-tested interfaces and safety assurance are not demonstrated. A service-role database client behind a generic authenticated API makes server-side authorization especially important; authenticated access alone is not the same as role-based permission to issue an operational command.</p>
+<h3>6.2 Commercial viability</h3><p>A specialized polar operations platform could be valuable to national research programmes and expedition operators if it measurably reduces coordination time, cargo loss, stockout risk or incident-response delay. The buyer may be an operations director or central IT/procurement organization, while daily users span stations, logistics, cargo and safety teams. This is a plausible market hypothesis only. The reviewed project contains no signed customer, user study, procurement route, willingness-to-pay evidence, cost model, support SLA or proof of measurable benefit.</p>
+<h3>6.3 Business model options (hypotheses, not current offers)</h3><ol>
+<li><strong>Paid institutional pilot + implementation:</strong> a 6–12 month scoped deployment with configuration, integration, training and support, followed by an annual platform/support contract.</li>
+<li><strong>Annual programme license:</strong> price per research programme, station group or theatre, with modules for cargo, sustainment, personnel/emergency and audit. Use support/integration tiers; avoid assuming cargo tonnage correlates with safety value.</li>
+<li><strong>Managed operations service:</strong> hosted platform with data-quality monitoring and support coverage. This adds sovereignty, data-residency, staffing and liability obligations.</li>
+<li><strong>Hardware/software bundle:</strong> rugged edge gateway plus sensor/beacon kits and connectivity. Potential differentiation, but materially higher certification, field service, battery and support costs.</li>
+<li><strong>Adjacent-market expansion:</strong> Arctic research and other remote expeditions are possible later segments, but require separate workflow and buyer validation.</li></ol>
+<h3>6.4 Evidence required to establish viability</h3><ul><li>Interviews with central command, station commander, reefer/cargo lead, field-safety officer, maintenance and IT/security stakeholders.</li><li>Confirm the current toolchain and prove which handoffs are actually slow or error-prone.</li><li>Measure a baseline: unlocated cargo, cold-chain excursion dwell time, stockout alerts, muster completion time, delay attribution and data freshness.</li><li>Quantify integration and field-support cost, procurement lead time, security review, data residency, ownership and acceptable deployment model.</li><li>Test a buyer-funded pilot and willingness to renew before forecasting revenue or market size.</li></ul>
+</section>
+
+<section><h2>7. Risk register and readiness priorities</h2>
+<table><thead><tr><th>Priority</th><th>Risk / gap</th><th>Why it matters</th><th>Recommended control before operational reliance</th></tr></thead><tbody>
+<tr><td>Critical</td><td>Demo/simulated information can look live</td><td>Wrong vessel position, sensor state or weather could prompt unsafe decisions.</td><td>Strong demo-data banners; source timestamp/quality; stale-state alarm; separate simulation from production environment.</td></tr>
+<tr><td>Critical</td><td>No resilient offline/store-and-forward path</td><td>Remote polar connectivity may fail or be delayed.</td><td>Signed local event queue, idempotent replay, conflict resolution, visible unsynced count, stale-age warnings and tested recovery.</td></tr>
+<tr><td>Critical</td><td>No complete role/command authorization evidence</td><td>All authenticated operators are not necessarily authorized for every command.</td><td>Server-side RBAC/least privilege, MFA policy, approvals persisted centrally, break-glass controls and negative authorization tests.</td></tr>
+<tr><td>High</td><td>Cascade can partially write</td><td>Incident, voyage and cargo changes may not be atomic; recovery may not undo side effects.</td><td>Transactional or orchestrated state change, idempotency, explicit partial-failure states, compensation/recovery records.</td></tr>
+<tr><td>High</td><td>No field/hardware data integration</td><td>Static metrics and seeded tracking do not provide operational telemetry.</td><td>Define and validate source contracts, gateway ingestion, calibration, timestamping, quality checks and provenance.</td></tr>
+<tr><td>High</td><td>Schema, RLS and service-role governance</td><td>Server service role bypasses database row policies; current policies do not cover every new table.</td><td>Map roles to API operations, review RLS/table access, migrate schema repeatably, test least privilege and isolate test/prod data.</td></tr>
+<tr><td>High</td><td>Field and emergency workflows are incomplete</td><td>Person status is not the same as a sortie lifecycle, beacon confirmation or actual recall.</td><td>Validate station SOPs; implement dispatch/check-in/return states, acknowledgement, comms loss and escalation paths.</td></tr>
+<tr><td>Medium</td><td>Static forecast and weather values</td><td>Forecasts may be mistaken for calculated/authoritative values.</td><td>Show provenance, inputs, assumptions, validity window and confidence; label sample profiles visibly.</td></tr>
+<tr><td>Medium</td><td>Audit export and durability claims</td><td>Client-generated CSV and a label “append-only” do not alone establish immutability or legal auditability.</td><td>Server-side export, actor attribution, retention policy, tamper-evident controls, reviewable corrections and access logs.</td></tr>
+<tr><td>Medium</td><td>Limited automated test evidence</td><td>Build/typecheck cannot demonstrate correct permissions, persistence or cascade behavior.</td><td>Add API, auth, persistence and cross-module tests before field pilot; include failure injection and upgrade/migration checks.</td></tr>
+</tbody></table>
+<h3>Phased path</h3><ol><li><strong>Label and isolate:</strong> separate demonstration records from operational records; visibly identify every simulated/static value.</li><li><strong>Shadow-mode cargo pilot:</strong> connect one real sensor gateway and one shipment feed without allowing the console to control navigation or safety systems.</li><li><strong>Reliability and governance:</strong> add RBAC, audit hardening, offline behavior, idempotent sync, monitored data freshness and failure handling.</li><li><strong>Operational assurance:</strong> validate SOP fit with users, run a safety review, test under realistic low-bandwidth and clock-skew conditions, and document authority boundaries.</li><li><strong>Expand carefully:</strong> add personnel/emergency command authority only after the narrower pilot demonstrates reliable data and safe recovery.</li></ol>
+</section>
+
+<section><h2>8. Glossary: labels, status and notation</h2>
+<p>The application includes user-facing labels whose formal meanings are not always documented. Where the source does not define a term, this glossary marks it as <strong>not defined in the application</strong> rather than inventing a standard.</p>
+<h3>8.1 Operations and geography</h3><dl class="glossary">
+<dt>Command centre / command console</dt><dd>The authenticated application shell used to review operational information and issue supported API-backed status changes.</dd>
+<dt>Station node / station network</dt><dd>A named polar base or operational location; node cards display identity, theatre, occupancy, weather and coordinates.</dd>
+<dt>Theatre</dt><dd>Operational region grouping stations (the landing page references Arctic and Antarctic theatres).</dd>
+<dt>Voyage / expedition</dt><dd>A planned or active vessel mission represented by an expedition ID, ship, route, departure, ice-entry estimate and status.</dd>
+<dt>Ice corridor</dt><dd>The planned route segment through/near sea ice shown in voyage timeline/map context. It is a planning label, not a charted navigation service.</dd>
+<dt>Ice entry</dt><dd>Planned/estimated point or time of transition into the ice corridor; application examples include an ETA.</dd>
+<dt>Offload</dt><dd>Transfer of cargo from vessel to station. Current times and crane sequence are sample operational copy, not a port control interface.</dd>
+<dt>Sortie / work party</dt><dd>A field deployment or excursion away from a station. The schema has sortie fields; the current UI primarily changes personnel state.</dd>
+<dt>Muster</dt><dd>Personnel accountability check. The page’s reconcile button currently confirms locally via an alert rather than comparing a live roster/beacon source.</dd>
+<dt>Condition 1</dt><dd>UI name for the severe weather/incident state mapped in code to LEVEL_3_LIFE_THREATENING. Equivalence to an official real-world SOP or color code is not established.</dd>
+<dt>Cascade</dt><dd>Application workflow that records an incident and applies selected related state changes. It is not a guarantee that all operational systems or dependent records change atomically.</dd>
+<dt>Polar Class PC-3 / PC-5 / PC-6</dt><dd>Labels stored for vessel ice/polar class. The app does not include class criteria or verify an authoritative vessel registry; do not infer capability from the label alone.</dd>
+<dt>MV / RV</dt><dd>Prefixes displayed in ship names. The application does not define them; conventionally MV means Motor Vessel and RV means Research Vessel, but the source does not verify each ship’s formal designation.</dd>
+<dt>Fast ice</dt><dd>Appears in a cargo status value such as OFFLOADED_FAST_ICE. The application does not define the precise logistics status transition.</dd>
+</dl>
+<h3>8.2 Statuses and priority</h3>
+<table><thead><tr><th>Label/group</th><th>Meaning in this application</th></tr></thead><tbody>
+<tr><td>UNDERWAY</td><td>Voyage or movement is marked in progress.</td></tr><tr><td>DELAYED</td><td>Voyage is delayed; interface may show a day offset.</td></tr><tr><td>READY</td><td>Prepared/available status; meaning depends on voyage or asset context.</td></tr><tr><td>HOLD</td><td>Temporarily held; used for cargo or operational state.</td></tr><tr><td>ON STATION</td><td>Stationed/present state in the operational picture.</td></tr><tr><td>NORMAL</td><td>No current exception in the simplified cargo/status model.</td></tr><tr><td>CRITICAL</td><td>Requires urgent attention; used for cargo/status summaries.</td></tr><tr><td>RECALLED</td><td>Displayed status associated with emergency restrictions/return.</td></tr><tr><td>INDOOR</td><td>Personnel sheltered and accounted.</td></tr><tr><td>FIELD</td><td>Personnel active in a work party/field activity; interface refers to beacon lock.</td></tr><tr><td>SOS</td><td>Immediate response required, per UI copy.</td></tr><tr><td>IN USE</td><td>Asset assigned to an operation.</td></tr><tr><td>MAINTENANCE DUE</td><td>Asset requires service before the next sortie according to UI copy.</td></tr><tr><td>GROUNDED / OFFLINE</td><td>Asset unavailable/restricted states; exact maintenance/dispatch rules are not formalized.</td></tr><tr><td>Asset criticality V / E / D</td><td>Asset modal explicitly defines Vital, Essential, Desirable. Criticality expresses mission importance, not current health.</td></tr><tr><td>Routine / Urgent</td><td>Approval-request priorities displayed by the sample approval cards.</td></tr><tr><td>complete / active / next</td><td>Timeline milestone state labels.</td></tr></tbody></table>
+<h3>8.3 Colors, map symbols and interface notation</h3><table><thead><tr><th>Visual notation</th><th>What it communicates</th><th>Qualification</th></tr></thead><tbody>
+<tr><td>Red</td><td>Critical, SOS, recalled, restricted or emergency emphasis.</td><td>Context-dependent; do not treat color as a single status code.</td></tr><tr><td>Amber</td><td>Delay, hold, warning or attention state.</td><td>Context-dependent.</td></tr><tr><td>Cyan</td><td>Normal, ready, underway or informational state depending on component.</td><td>Not globally one meaning.</td></tr><tr><td>Green</td><td>On-station/positive state and online-style decorative indicators.</td><td>A pulsing dot is not a verified sensor/network heartbeat.</td></tr><tr><td>Slate/gray</td><td>Neutral/other status; map UAV marker is slate-colored.</td><td>Map symbol and status badge colors are separate legends.</td></tr><tr><td>Teal circle</td><td>Station node on map.</td><td>Same family also marks tug boats; use legend and popup.</td></tr><tr><td>Yellow circle</td><td>Vessel on map.</td><td>Map marker, not vessel condition.</td></tr><tr><td>Purple circle</td><td>Helicopter on map.</td><td>Map marker.</td></tr><tr><td>Slate circle</td><td>UAV on map.</td><td>Map marker.</td></tr><tr><td>Cyan dashed line</td><td>India cargo lane.</td><td>Demonstration route.</td></tr><tr><td>Yellow dashed line</td><td>Open route.</td><td>Route visualization; not a clearance.</td></tr><tr><td>Red dashed line</td><td>Restricted route.</td><td>Application state visualization only.</td></tr><tr><td>+Nd</td><td>Delay by N days; for example +1d means one day.</td><td>UI shorthand.</td></tr><tr><td>D0 / D4 / D8 / D12 / D16 / D20</td><td>Day points on fuel runway projection; D0 is projection start, D20 is day 20.</td><td>Projected sample curve.</td></tr></tbody></table>
+<h3>8.4 Acronyms, units and identifiers</h3><table><thead><tr><th>Term</th><th>Explanation / status</th></tr></thead><tbody>
+<tr><td>NCPOR</td><td>National Centre for Polar &amp; Ocean Research, spelled out in the application header.</td></tr><tr><td>UTC</td><td>Coordinated Universal Time, used for displayed clock/event timestamps.</td></tr><tr><td>ETA</td><td>Estimated time of arrival.</td></tr><tr><td>kn / kt</td><td>Knots, a speed unit (nautical miles per hour). Used for movement and weather-wind copy.</td></tr><tr><td>kg / t</td><td>Kilogram / tonne (metric tonne); cargo mass units.</td></tr><tr><td>°C</td><td>Degrees Celsius; cargo temperature.</td></tr><tr><td>g</td><td>Shock measurement expressed as multiples of gravitational acceleration; the UI uses 1.5 g as a watch threshold.</td></tr><tr><td>km / m</td><td>Kilometres / metres; visibility-distance display.</td></tr><tr><td>L/day</td><td>Litres per day; inventory consumption/daily draw unit.</td></tr><tr><td>ID</td><td>Identifier; used for station, voyage, asset, request and tracking records.</td></tr><tr><td>REQ-204 etc.</td><td>Sample operator approval request identifier prefix; no external request system integration is evidenced.</td></tr><tr><td>PLX-804-19 etc.</td><td>Sample cargo/tracking identifier; PLX is not formally expanded in application code.</td></tr><tr><td>UAV</td><td>Unmanned aerial vehicle, used as tracking-unit type.</td></tr><tr><td>SEA / AIR / AIR-SEA RELAY</td><td>Transport mode labels. AIR / SEA RELAY indicates a mixed-mode demonstration lane.</td></tr><tr><td>METEO</td><td>Weather card label; application does not define it further.</td></tr><tr><td>MRO</td><td>Appears in MRO_SPARE sample category. Commonly Maintenance, Repair and Operations, but the application does not spell this out.</td></tr><tr><td>ATF</td><td>Appears in fuel seed/category. Commonly Aviation Turbine Fuel; this expansion is inferred, not provided by project documentation.</td></tr><tr><td>IMDG</td><td>Appears as a dangerous-goods field in schema. Commonly International Maritime Dangerous Goods; no end-user workflow is implemented.</td></tr><tr><td>AWS</td><td>Appears in “AWS mast Alpha.” Likely an automatic weather station, but the code does not expand it.</td></tr><tr><td>ITBP / AIIMS</td><td>Appear in training/medical data references and are not expanded by the product UI/code.</td></tr><tr><td>VHF / sat phone</td><td>Communication fields in the field-sortie schema; VHF conventionally means Very High Frequency; no live radio/phone integration.</td></tr><tr><td>RLS</td><td>Row-level security, database policy mechanism. Server service-role access means API authorization still needs separate controls.</td></tr><tr><td>PostGIS</td><td>PostgreSQL spatial extension represented in schema for coordinates/geometries.</td></tr><tr><td>CSV / PDF</td><td>Export formats. Current audit CSV is assembled in the browser; print/PDF uses the browser print dialog.</td></tr></tbody></table>
+</section>
+
+<section><h2>9. Conclusion</h2>
+<p>PolarLogix has a clear operational concept and a well-structured prototype footprint. Its strongest demonstration is the way it brings station status, voyage planning, cargo condition, stock runway, people, equipment and incident history into a single interface. Several core state mutations are backed by the API and Supabase, so this is more than a static visual mockup.</p>
+<p>At the same time, this review did not find evidence that the product currently receives authoritative live vessel positions, live cargo sensors, verified weather, actual beacon/radio data, or a durable offline queue. Some demonstration controls can write to the database; simulated and sample data therefore need explicit isolation. Authentication is present, but per-role command authorization and formal operational sign-off are not demonstrated.</p>
+<div class="callout good"><strong>Decision recommendation:</strong> continue product development toward a bounded, paid or sponsored institutional shadow-mode pilot. Start with the cargo exception and sustainment workflow; measure user and operational outcomes; use the system in parallel with existing authoritative processes. Do not enable autonomous navigation or safety-critical command reliance until data provenance, offline behavior, role controls, failure recovery, field usability and safety assurance have all passed agreed acceptance tests.</div>
+<p>Commercially, an institutional pilot followed by an annual programme license or managed platform is a credible hypothesis. Whether it is viable depends on proving a buyer, procurement path, measurable operational value and support economics—not on the feature set alone.</p>
+</section>
+
+<section><h2>Source register</h2>
+<p class="small">These sources were reviewed for this report. References use workspace-relative paths.</p>
+<table><thead><tr><th>Ref</th><th>Source</th><th>Used for</th></tr></thead><tbody>
+<tr><td>[S1]</td><td><code>artifacts/polarlogix-operations/src/App.tsx</code> (routing, shell, data refresh/mutations, module components and visible copy; approx. lines 50–743)</td><td>Page inventory, controls, static/sample values, simulated map, scenario/runbook, audit export.</td></tr>
+<tr><td>[S2]</td><td><code>artifacts/polarlogix-operations/src/lib/operations-types.ts</code> (types/status enums; approx. lines 1–146)</td><td>Domain entities, field names, status and emergency enums.</td></tr>
+<tr><td>[S3]</td><td><code>artifacts/polarlogix-operations/src/lib/operations-api.ts</code> (API client; approx. lines 12–89)</td><td>Browser-to-API request paths and mutation methods.</td></tr>
+<tr><td>[S4]</td><td><code>artifacts/api-server/src/routes/operations.ts</code> and <code>src/app.ts</code></td><td>API route inventory, Clerk auth gate and request handling.</td></tr>
+<tr><td>[S5]</td><td><code>artifacts/api-server/src/lib/operations-service.ts</code> (snapshot, seed and mutations; approx. lines 91–533)</td><td>Seed data, mapping, tracking values and persistence behavior.</td></tr>
+<tr><td>[S6]</td><td><code>artifacts/api-server/src/lib/supabase.ts</code></td><td>Server-side Supabase client and service credential boundary.</td></tr>
+<tr><td>[S7]</td><td><code>artifacts/api-server/schema.sql</code> (tables, spatial types, constraints and policies; approx. lines 1–285)</td><td>Database entities, PostGIS/RLS, field-sortie schema and policy coverage.</td></tr>
+<tr><td>[S8]</td><td><code>artifacts/polarlogix-operations/package.json</code>, <code>artifacts/api-server/package.json</code>, workspace and artifact manifests</td><td>Libraries, build scripts and runtime services.</td></tr>
+<tr><td>[S9]</td><td><code>artifacts/polarlogix-operations/README.md</code> and root <code>replit.md</code></td><td>Product intent, persistence notes and deployment assumptions.</td></tr>
+</tbody></table>
+<p class="footer-note">Prepared from source review. This document is a product and technical assessment, not a safety certification, procurement commitment, customer validation study, or legal opinion. Any safety procedure, vessel classification, medical/training clearance, or regulatory requirement must be confirmed with the relevant authority before use.</p>
+</section>
+</body></html>

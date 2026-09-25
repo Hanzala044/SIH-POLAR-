@@ -1,0 +1,71 @@
+Continue from the current PolarLogix state (provenance + honest runway already implemented and typechecked).
+
+Implement the next three highest-priority items **in this exact order**. Do not expand scope beyond what is listed.
+
+### Mandatory cross-cutting rule (apply to everything below)
+- **Inventory addition and subtraction** (`+` / `–` controls) must work correctly, update the snapshot, recalculate runway with the approved formulas, write an operation event, and respect offline queue + RBAC.
+- **Approval and Rejection** must work properly across **all features**:
+  - Durable server-side records (no localStorage).
+  - Role-gated (only COMMAND or SAFETY can approve/reject).
+  - Every decision logs actor, role, justification, timestamp.
+  - UI reflects the decision immediately and consistently in Overview, Audit, and any related module.
+  - Works both online and when queued offline.
+
+### 1. Durable Offline Command Queue (Critical)
+- Detect online/offline using `navigator.onLine` + periodic `/api/healthz`.
+- When offline, **every mutation** is written to a persistent IndexedDB (or equivalent) queue:
+  - voyage status changes
+  - inventory adjust (`+` / `–`)
+  - personnel status
+  - asset status
+  - cargo anomaly
+  - emergency cascade / resolve
+  - approval / rejection decisions
+- Each queued item must contain:
+  - unique idempotency key
+  - original payload
+  - timestamp
+  - intended endpoint
+- Header must display the **real** queue length (replace any hardcoded 0 or 77).
+- On reconnect, replay the queue in order. Surface conflicts clearly to the user.
+- Show a persistent banner:  
+  `STALE DATA – last successful sync XX min ago`  
+  when the snapshot is older than 90 seconds **or** when offline.
+- Keep the existing 10-second polling; only add the offline path.
+
+### 2. Server-side RBAC + Persistent Approvals
+- Define exactly four roles: `COMMAND`, `LOGISTICS`, `SAFETY`, `VIEWER`.
+- Enforce role checks on **every** mutation endpoint in the Express API (return 403 if insufficient).
+- Move all operator-approval cards from localStorage to **durable server records**.
+- UI must hide or disable any button the current role cannot use.
+- Approval and Rejection must:
+  - Work from the Overview cards and from any module that surfaces pending requests.
+  - Persist actor + role + justification + UTC timestamp.
+  - Appear correctly in the activity feed and Audit log.
+  - Be queueable when offline and replayable on reconnect.
+
+### 3. Complete Field-Sortie Lifecycle + Emergency Recovery
+- Fully wire the existing `field_sorties` schema:
+  - Create / dispatch sortie (assign people, expected return window)
+  - Check-in / beacon confirm
+  - Return / close
+  - Overdue escalation
+- Personnel status changes (`INDOOR` / `FIELD` / `SOS`) must be linked to active sorties.
+- When Condition 1 / cascade is triggered:
+  - Auto-recall **all** open FIELD sorties → `RECALLED`
+  - Prevent new FIELD dispatches while Condition 1 is active
+  - On `DECLARE RECOVERY`, allow controlled re-dispatch **only** after explicit `COMMAND` or `SAFETY` confirmation
+- Recovery must be compensatable (no orphaned open sorties left behind).
+
+### After these three items
+- Re-run typecheck and formula validation.
+- Confirm:
+  - Header shows real offline queue count
+  - Stale-data banner appears correctly
+  - Role restrictions block unauthorized mutations
+  - Inventory `+` / `–` works online, offline, and recalculates runway correctly
+  - Approval / Rejection works from any relevant screen and is durable
+  - Condition 1 correctly recalls all open field sorties and recovery is clean
+- Do **not** yet implement scenario recommendations or audit/export hardening.
+
+Report exactly what was changed, any new state machines or formulas, and any remaining open issues.

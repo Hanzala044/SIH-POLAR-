@@ -45,44 +45,44 @@
 }
 
 :root {
-  --background: 45 20% 95%;
-  --foreground: 216 31% 18%;
-  --border: 42 13% 83%;
-  --input: 42 13% 76%;
-  --ring: 197 67% 42%;
-  --card: 45 33% 99%;
-  --card-foreground: 216 31% 18%;
-  --card-border: 42 13% 83%;
-  --popover: 45 33% 99%;
-  --popover-foreground: 216 31% 18%;
-  --popover-border: 42 13% 83%;
-  --primary: 197 67% 35%;
-  --primary-foreground: 45 33% 99%;
-  --secondary: 216 24% 91%;
-  --secondary-foreground: 216 31% 22%;
-  --muted: 42 18% 90%;
-  --muted-foreground: 216 12% 45%;
-  --accent: 43 91% 58%;
-  --accent-foreground: 216 31% 18%;
+  --background: 207 37% 96%;
+  --foreground: 215 46% 15%;
+  --border: 209 28% 86%;
+  --input: 209 24% 80%;
+  --ring: 185 85% 40%;
+  --card: 210 40% 99%;
+  --card-foreground: 215 46% 15%;
+  --card-border: 209 28% 86%;
+  --popover: 210 40% 99%;
+  --popover-foreground: 215 46% 15%;
+  --popover-border: 209 28% 86%;
+  --primary: 194 91% 29%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 208 34% 91%;
+  --secondary-foreground: 215 42% 18%;
+  --muted: 207 30% 92%;
+  --muted-foreground: 213 17% 42%;
+  --accent: 183 80% 88%;
+  --accent-foreground: 212 44% 17%;
   --destructive: 4 76% 53%;
   --destructive-foreground: 204 45% 98%;
-  --sidebar: 216 36% 14%;
-  --sidebar-foreground: 216 24% 84%;
-  --sidebar-border: 216 27% 23%;
-  --sidebar-primary: 43 91% 58%;
-  --sidebar-primary-foreground: 216 36% 13%;
-  --sidebar-accent: 213 32% 28%;
-  --sidebar-accent-foreground: 45 33% 99%;
+  --sidebar: 219 48% 11%;
+  --sidebar-foreground: 200 30% 90%;
+  --sidebar-border: 214 32% 24%;
+  --sidebar-primary: 184 97% 57%;
+  --sidebar-primary-foreground: 219 48% 11%;
+  --sidebar-accent: 214 38% 20%;
+  --sidebar-accent-foreground: 185 70% 95%;
   --app-font-sans: 'Manrope', sans-serif;
   --app-font-mono: 'DM Mono', monospace;
   --radius: 0.65rem;
-  --primary-border: hsl(197 67% 28%);
-  --secondary-border: hsl(42 13% 76%);
-  --accent-border: hsl(43 82% 48%);
+  --primary-border: hsl(194 90% 22%);
+  --secondary-border: hsl(209 24% 80%);
+  --accent-border: hsl(183 70% 72%);
   --destructive-border: hsl(4 72% 43%);
-  --muted-border: hsl(42 13% 78%);
-  --elevate-1: rgba(35, 46, 57, .045);
-  --elevate-2: rgba(35, 46, 57, .085);
+  --muted-border: hsl(209 24% 82%);
+  --elevate-1: rgba(20, 43, 59, .045);
+  --elevate-2: rgba(20, 43, 59, .09);
 }
 
 * { box-sizing: border-box; }
@@ -108,12 +108,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @keyframes reveal { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse-dot { 50% { opacity: .42; transform: scale(.82); } }
 .pulse-dot { animation: pulse-dot 1.7s ease-in-out infinite; }
-.leaflet-command-button { display: inline-flex; min-height: 30px; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(20,35,55,.92); padding: 0 10px; color: #e6fbff; font: 700 9px var(--app-font-sans); letter-spacing: .08em; }
+.operations-sidebar[data-sidebar="sidebar"],
+.operations-sidebar [data-sidebar="sidebar"] {
+  background-image:
+    linear-gradient(rgba(102, 221, 238, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(102, 221, 238, .035) 1px, transparent 1px),
+    radial-gradient(ellipse at 100% 0%, rgba(44, 216, 233, .12), transparent 42%),
+    linear-gradient(160deg, hsl(218 48% 13%), hsl(222 54% 9%));
+  background-size: 56px 56px, 56px 56px, auto, auto;
+}
+.leaflet-command-button { display: inline-flex; min-height: 30px; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(16,28,46,.94); padding: 0 10px; color: #e4f6fb; font: 700 9px var(--app-font-sans); letter-spacing: .08em; }
 .leaflet-popup-card { min-width: 205px; color: #172236; font-family: var(--app-font-sans); }
-.leaflet-popup-link { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; border-radius: 5px; background: #e4f4f5; padding: 0 8px; color: #075b66; font-size: 10px; font-weight: 800; }
-.asset-model { position: relative; display: flex; min-height: 310px; flex-direction: column; overflow: hidden; border-radius: .9rem; background: linear-gradient(145deg, #075b66, #172236 70%); padding: 1.5rem; color: white; box-shadow: inset 0 -36px 80px rgba(0,0,0,.3); }
+.leaflet-popup-link { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; border-radius: 5px; background: #def5f7; padding: 0 8px; color: #075f78; font-size: 10px; font-weight: 800; }
+.asset-model { position: relative; display: flex; min-height: 310px; flex-direction: column; overflow: hidden; border-radius: .9rem; background: linear-gradient(145deg, #087a94, #101c2e 70%); padding: 1.5rem; color: white; box-shadow: inset 0 -36px 80px rgba(0,0,0,.3); }
 .asset-model::before { content: ''; position: absolute; inset: 0; opacity: .22; background-image: linear-gradient(135deg, transparent 48%, rgba(255,255,255,.35) 49%, transparent 50%), linear-gradient(45deg, transparent 48%, rgba(255,255,255,.2) 49%, transparent 50%); background-size: 42px 42px; }
-.asset-model__shape { position: relative; z-index: 1; align-self: center; margin: auto; height: 90px; width: 62%; transform: perspective(420px) rotateX(56deg) rotateZ(-12deg); border: 2px solid rgba(255,255,255,.55); border-radius: 18% 35% 20% 12%; background: linear-gradient(135deg, #f8fafc, #64748b 55%, #172236); box-shadow: 22px 24px 0 rgba(0,0,0,.24), inset 0 -10px 0 rgba(241,183,46,.9); }
+.asset-model__shape { position: relative; z-index: 1; align-self: center; margin: auto; height: 90px; width: 62%; transform: perspective(420px) rotateX(56deg) rotateZ(-12deg); border: 2px solid rgba(255,255,255,.55); border-radius: 18% 35% 20% 12%; background: linear-gradient(135deg, #f8fafc, #64748b 55%, #101c2e); box-shadow: 22px 24px 0 rgba(0,0,0,.24), inset 0 -10px 0 rgba(48,226,239,.9); }
 .asset-model--generator .asset-model__shape { height: 105px; width: 48%; transform: perspective(420px) rotateX(52deg) rotateZ(-8deg); border-radius: 12%; }
 .asset-model--instrument .asset-model__shape { height: 120px; width: 30%; transform: perspective(420px) rotateX(55deg) rotateZ(18deg); border-radius: 8%; }
 .asset-model--container .asset-model__shape { height: 78px; width: 64%; transform: perspective(420px) rotateX(55deg) rotateZ(-8deg); border-radius: 5%; }

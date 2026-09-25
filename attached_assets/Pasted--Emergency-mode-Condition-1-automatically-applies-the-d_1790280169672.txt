@@ -1,0 +1,113 @@
+- Emergency mode (Condition 1) automatically applies the documented 18 % uplift and re-calculates all runways live.
+- Show the exact formula and the 18 % factor in the UI.
+- Add a “What-if” slider: “If burn increases by X % how many days remain?”
+
+### C. Real Offline / Store-and-Forward Queue
+- Detect navigator.onLine and server reachability.
+- When offline, all mutations (status changes, inventory adjust, personnel state, cascade) go into a persistent IndexedDB / local queue.
+- Show exact queue length in the header (replace the hardcoded “77 QUEUED” or “0”).
+- On reconnect, replay with idempotency keys and surface any conflicts.
+- Display “STALE DATA – last sync XX min ago” banner when applicable.
+
+### D. Role-Based Access Control (RBAC)
+- Define four roles: `COMMAND`, `LOGISTICS`, `SAFETY`, `VIEWER`.
+- Server-side enforcement on every mutation endpoint.
+- UI hides or disables actions the current role cannot perform.
+- Approvals become durable records that require COMMAND or SAFETY sign-off.
+
+### E. Complete Field Sortie Lifecycle
+- Implement the existing `field_sorties` schema fully:
+- Dispatch (create sortie, assign people, expected return)
+- Check-in / beacon confirm
+- Return / close
+- Overdue escalation
+- Link personnel status changes to active sorties.
+- On Condition 1, auto-recall all open sorties and force FIELD → RECALLED.
+
+### F. Advanced Smart Automation Features
+1. **Cascade Impact Score**
+ - When Condition 1 is triggered, show a scored impact card:
+   - Personnel recalled: X
+   - Cargo handling paused: Y consignments
+   - Fuel runway reduction: Z days
+   - Voyage milestones delayed: list
+2. **Predictive Exception Engine**
+ - Simple rule-based predictions:
+   - “At current burn, critical stock in 4.2 days”
+   - “Cold-chain PLX-805-02 will exceed 1.5 g threshold if shock trend continues”
+3. **What-If Scenario Planner** (enhance existing /scenarios)
+ - Weather degradation, vessel delay, cargo failure, generator failure, personnel SOS.
+ - Each scenario shows before/after numbers with exact deltas.
+4. **Auto-Recommendation Cards**
+ - “Recommend HOLD on MV Vasundhara – ice entry window closing”
+ - “Recommend RECALL of 2 field parties – visibility < 120 m”
+
+### G. Enhanced Map (Leaflet) – Theatre Operating Picture
+- Keep existing Leaflet map but make every marker and polyline data-driven from the shared snapshot.
+- Add:
+- Temperature / cold-chain heatmap layer (calculated from cargo telemetry)
+- Ice-corridor risk colouring (open / restricted / whiteout)
+- Live (simulated) vessel trails with exact speed, heading, ETA formula
+- Field party beacons with last-seen age
+- Click-through to the exact module record
+- All movement remains SIMULATED and labeled.
+
+### H. Balanced, Coherent Demo Dataset
+Create one single, consistent “17 Feb 2025 – Shift 02” theatre state that is used everywhere:
+
+- Stations: Maitri 39/48, Bharati 42/47, Himadri 12/16 (exact occupancy)
+- Voyages: 5 vessels with realistic ETAs, polar class, and one delayed by exactly +1 d
+- Cargo: 10–12 consignments with exact temp/shock values; one CRITICAL at –11.4 °C / 1.76 g
+- Inventory: Arctic diesel 18 420 L, exact daily draws (860 / 260 / 410), thresholds that produce meaningful runway numbers
+- Personnel: 11 accounted, 4 FIELD, medical/training validity days exact
+- Assets: mix of VEHICLE / GENERATOR / SCIENCE with realistic next-service dates
+- Events: a coherent recent activity feed that matches the cascade history
+
+All calculations must be re-computable from the raw numbers shown.
+
+### I. Audit & Decision Record Hardening
+- Server-side immutable event append
+- Actor + role + justification required for every command
+- Server-generated CSV / PDF export endpoint
+- Visible “Append-only · Actor-attributed · UTC” badge
+
+---
+
+## 4. Implementation Order (Recommended)
+
+1. Provenance / CalculatedValue component + apply to all headline metrics
+2. Honest fuel & life-support runway engine with visible formulas
+3. Coherent demo dataset + seed script that produces the balanced state
+4. Offline queue + stale-data banners
+5. RBAC (roles + server enforcement)
+6. Complete field-sortie lifecycle
+7. Cascade impact scoring + transactional/compensating cascade
+8. Predictive recommendations + enhanced Scenario Planner
+9. Map data-binding + temperature heatmap layer
+10. Audit hardening + server export
+
+---
+
+## 5. Acceptance Criteria
+
+- Every statistic on screen is either LIVE, DEMO, SIMULATED or CALCULATED and shows its formula or source.
+- Fuel runway, life-support days, readiness index, cargo exception counts, and personnel accounted numbers are mathematically consistent with the underlying data.
+- Offline mode works: queue grows, mutations are replayed, conflicts surface.
+- Condition 1 produces a clear, scored cross-module impact and is recoverable without leaving inconsistent state.
+- A new operator can understand in < 30 seconds which numbers are real vs demo.
+- The application remains a single centralized picture of expedition planning, cargo, inventory, personnel movement and emergency response.
+- No claim of live navigation or safety-critical authority is made.
+
+---
+
+## 6. Deliverables
+
+- Updated source code with the features above
+- Updated seed / initialize script that produces the coherent demo theatre
+- Short “Provenance & Calculation Reference” section in the README explaining every major formula
+- Visual badges and tooltips that make honesty impossible to miss
+- No regression in existing modules
+
+Start with the Provenance layer and the honest runway engine, then expand outward. Keep the existing “NO LIVE NAVIGATION CONTROL” and demo labels strong.
+
+Make PolarLogix the most transparent, calculation-honest, and operationally coherent polar command prototype possible while fully covering the five pillars of SIH 26062.

@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "./supabase";
+import type { OperatorIdentity } from "./operations-auth";
 
 type Status =
   | "ON STATION"
@@ -25,6 +27,9 @@ export type OperationsSnapshot = {
   trackingUnits: TrackingUnit[];
   events: Array<Record<string, unknown>>;
   emergency: Record<string, unknown>;
+  currentUser: OperatorIdentity;
+  operatorRequests: Array<Record<string, unknown>>;
+  fieldSorties: Array<Record<string, unknown>>;
 };
 
 export type TrackingUnitKind = "VESSEL" | "TUG BOAT" | "HELICOPTER" | "UAV";
@@ -37,6 +42,10 @@ export type TrackingUnit = {
   status: string;
   detail: string;
   voyageId?: string;
+  routeKey?: string;
+  progress?: number;
+  speedKnots?: number;
+  eta?: string;
 };
 
 const standbyEmergency = {
@@ -287,9 +296,11 @@ function incidentToEmergency(row: Record<string, unknown>) {
   };
 }
 
-export async function loadOperations(): Promise<OperationsSnapshot> {
+export async function loadOperations(currentUser: OperatorIdentity): Promise<OperationsSnapshot> {
   await ensureDatabaseReady();
-  const [stationResult, voyageResult, cargoResult, telemetryResult, inventoryResult, personnelResult, assetResult, eventResult, incidentResult] = await Promise.all([
+  const escalation = await supabaseAdmin.rpc("mark_overdue_field_sorties");
+  if (escalation.error) throw new Error(`Overdue sortie escalation failed: ${escalation.error.message}`);
+  const [stationResult, voyageResult, cargoResult, telemetryResult, inventoryResult, personnelResult, assetResult, eventResult, incidentResult, sortieResult, sortiePersonnelResult, requestResult, decisionResult] = await Promise.all([
     supabaseAdmin.from("polar_stations").select("*").order("station_code"),
     supabaseAdmin.from("expedition_voyages").select("*").order("created_at", { ascending: false }),
     supabaseAdmin.from("cargo_manifest").select("*").order("updated_at", { ascending: false }),
@@ -299,8 +310,12 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
     supabaseAdmin.from("operational_assets").select("*").order("asset_code"),
     supabaseAdmin.from("operation_events").select("*").order("event_time", { ascending: false }),
     supabaseAdmin.from("emergency_incidents").select("*").order("created_at", { ascending: false }).limit(20),
+    supabaseAdmin.from("field_sorties").select("*").order("departure_time", { ascending: false }),
+    supabaseAdmin.from("field_sortie_personnel").select("*"),
+    supabaseAdmin.from("operator_access_requests").select("*").order("submitted_at", { ascending: false }),
+    supabaseAdmin.from("operator_access_decisions").select("*"),
   ]);
-  const results = [stationResult, voyageResult, cargoResult, telemetryResult, inventoryResult, personnelResult, assetResult, eventResult, incidentResult];
+  const results = [stationResult, voyageResult, cargoResult, telemetryResult, inventoryResult, personnelResult, assetResult, eventResult, incidentResult, sortieResult, sortiePersonnelResult, requestResult, decisionResult];
   const failed = results.find(result => result.error);
   if (failed?.error) throw new Error(`Supabase read failed: ${failed.error.message}`);
 
@@ -320,6 +335,7 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
     id: row.voyage_id,
     expedition: row.expedition_number,
     vessel: row.vessel_name,
+    vesselImo: row.vessel_imo_number,
     polarClass: row.polar_class_rating,
     route: `${row.departure_port} → ${row.intermediate_port}`,
     status: statusFromVoyage(row.voyage_status),
@@ -369,6 +385,7 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
     training: row.itbp_survival_training_cleared ? "Current" : "Refresh due",
     blood: row.blood_group,
     status: row.current_safety_status === "FIELD_SORTIE" ? "FIELD" : row.current_safety_status === "MEDEVAC_IN_PROGRESS" || row.current_safety_status === "OFFLINE_UNACCOUNTED" ? "SOS" : "INDOOR",
+    availableForSortie: row.current_safety_status === "INDOORS_STATION",
   }));
   const assets = (assetResult.data || []).map(row => ({
     id: String(row.asset_code),
@@ -387,7 +404,59 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
     tone: row.tone,
     user: row.user_name ? String(row.user_name) : undefined,
     justification: row.justification ? String(row.justification) : undefined,
+    actorRole: row.actor_role ? String(row.actor_role) : undefined,
   }));
+  const personnelNames = new Map((personnelResult.data || []).map(row => [String(row.personnel_id), String(row.full_name)]));
+  const assignedBySortie = new Map<string, Record<string, unknown>[]>();
+  for (const assignment of sortiePersonnelResult.data || []) {
+    const sortieId = String(assignment.sortie_id);
+    const assignments = assignedBySortie.get(sortieId) || [];
+    assignments.push(assignment);
+    assignedBySortie.set(sortieId, assignments);
+  }
+  const fieldSorties = (sortieResult.data || []).map(row => ({
+    id: String(row.sortie_id),
+    stationId: row.station_id ? String(row.station_id) : undefined,
+    station: stationNamesById.get(String(row.station_id)) || "Unassigned",
+    destination: String(row.destination_name),
+    leadPersonId: String(row.lead_personnel_id || ""),
+    leadPerson: personnelNames.get(String(row.lead_personnel_id)) || "Unassigned",
+    departureTime: String(row.departure_time),
+    expectedReturnTime: String(row.expected_return_time),
+    actualReturnTime: row.actual_return_time ? String(row.actual_return_time) : undefined,
+    vehicle: row.vehicle_identifier ? String(row.vehicle_identifier) : undefined,
+    commFrequency: String(row.comm_frequency_vhf),
+    satPhoneCallsign: row.sat_phone_callsign ? String(row.sat_phone_callsign) : undefined,
+    status: String(row.sortie_status),
+    recalledAt: row.recalled_at ? String(row.recalled_at) : undefined,
+    overdueEscalatedAt: row.overdue_escalated_at ? String(row.overdue_escalated_at) : undefined,
+    assignedPersonnel: (assignedBySortie.get(String(row.sortie_id)) || []).map(assignment => ({
+      id: String(assignment.personnel_id),
+      name: personnelNames.get(String(assignment.personnel_id)) || "Unknown operator",
+      status: String(assignment.assignment_status),
+      beaconConfirmedAt: assignment.beacon_confirmed_at ? String(assignment.beacon_confirmed_at) : undefined,
+      actualReturnTime: assignment.actual_return_time ? String(assignment.actual_return_time) : undefined,
+    })),
+  }));
+  const decisionsByRequest = new Map((decisionResult.data || []).map(row => [String(row.request_id), row]));
+  const operatorRequests = (requestResult.data || []).map(row => {
+    const decision = decisionsByRequest.get(String(row.request_id));
+    return {
+      id: String(row.request_id),
+      operator: String(row.operator_name),
+      role: String(row.requested_role),
+      station: String(row.station_name),
+      stationCode: String(row.station_code),
+      request: String(row.request_summary),
+      submitted: formatDateTime(row.submitted_at),
+      priority: String(row.priority),
+      status: String(row.request_status),
+      decisionActor: decision?.actor_name ? String(decision.actor_name) : undefined,
+      decisionRole: decision?.actor_role ? String(decision.actor_role) : undefined,
+      decisionJustification: decision?.justification ? String(decision.justification) : undefined,
+      decidedAt: decision?.decided_at ? String(decision.decided_at) : undefined,
+    };
+  });
   const latestIncident = (incidentResult.data || []).find(row => !row.is_resolved);
   return {
     stations,
@@ -399,6 +468,9 @@ export async function loadOperations(): Promise<OperationsSnapshot> {
     trackingUnits,
     events,
     emergency: latestIncident ? incidentToEmergency(latestIncident) : standbyEmergency,
+    currentUser,
+    operatorRequests,
+    fieldSorties,
   };
 }
 
@@ -410,20 +482,47 @@ function parseDateOnly(value: string) {
 
 export async function createVoyage(voyage: Record<string, unknown>) {
   await ensureDatabaseReady();
-  const route = String(voyage.route || "");
-  const parts = route.split("→").map(part => part.trim());
-  const { error } = await supabaseAdmin.from("expedition_voyages").insert({
-    expedition_number: String(voyage.expedition),
-    vessel_name: String(voyage.vessel),
-    vessel_imo_number: `PLX-${Date.now()}`,
-    polar_class_rating: String(voyage.polarClass),
-    departure_port: parts[0] || "Goa, India",
-    intermediate_port: parts.at(-1) || "Maitri",
-    planned_departure_date: parseDateOnly(String(voyage.departure)),
-    estimated_ice_entry_date: parseDateOnly(String(voyage.iceEntry).replace("·", "")),
-    voyage_status: voyageStatusToDb(String(voyage.status) as Status),
-  });
+  const expedition = String(voyage.expedition || "").trim();
+  const vessel = String(voyage.vessel || "").trim();
+  const polarClass = String(voyage.polarClass || "").trim();
+  const routeParts = String(voyage.route || "").split("→").map(part => part.trim());
+  const departurePort = routeParts[0] || "";
+  const destinationPort = routeParts.at(-1) || "";
+  const departureDate = parseDateOnly(String(voyage.departure || ""));
+  const iceEntryDate = parseDateOnly(String(voyage.iceEntry || ""));
+  const status = String(voyage.status || "READY") as Status;
+  const suppliedId = String(voyage.id || "");
+  const voyageId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedId)
+    ? suppliedId
+    : randomUUID();
+  const suppliedImo = String(voyage.vesselImo || "").trim();
+  const vesselImo = suppliedImo || `PLX-${voyageId.replaceAll("-", "").slice(0, 12).toUpperCase()}`;
+
+  if (!expedition || !vessel || !polarClass || !departurePort || !destinationPort) {
+    throw new Error("Expedition, vessel, polar class, departure port, and destination are required.");
+  }
+  if (departureDate > iceEntryDate) {
+    throw new Error("Estimated ice-entry date cannot be earlier than planned departure.");
+  }
+  if (!["READY", "UNDERWAY", "DELAYED"].includes(status)) {
+    throw new Error("Choose a supported voyage status.");
+  }
+  if (vesselImo.length > 20) throw new Error("Vessel IMO / registry reference must be 20 characters or fewer.");
+
+  const { data, error } = await supabaseAdmin.from("expedition_voyages").insert({
+    voyage_id: voyageId,
+    expedition_number: expedition,
+    vessel_name: vessel,
+    vessel_imo_number: vesselImo,
+    polar_class_rating: polarClass,
+    departure_port: departurePort,
+    intermediate_port: destinationPort,
+    planned_departure_date: departureDate,
+    estimated_ice_entry_date: iceEntryDate,
+    voyage_status: voyageStatusToDb(status),
+  }).select("voyage_id").single();
   if (error) throw new Error(`Supabase voyage write failed: ${error.message}`);
+  return { voyageId: String(data.voyage_id) };
 }
 
 export async function updateVoyageStatus(id: string, status: Status) {
@@ -443,14 +542,14 @@ export async function adjustInventory(sku: string, delta: number) {
   if (error) throw new Error(`Supabase inventory write failed: ${error.message}`);
 }
 
-export async function updatePersonnelStatus(id: string, status: PersonStatus) {
+export async function updatePersonnelStatus(id: string, status: PersonStatus, identity: OperatorIdentity) {
   await ensureDatabaseReady();
-  const currentSafetyStatus = status === "FIELD" ? "FIELD_SORTIE" : status === "SOS" ? "MEDEVAC_IN_PROGRESS" : "INDOORS_STATION";
-  const { error } = await supabaseAdmin.from("expedition_personnel").update({
-    current_safety_status: currentSafetyStatus,
-    updated_at: new Date().toISOString(),
-  }).eq("personnel_id", id);
-  if (error) throw new Error(`Supabase personnel write failed: ${error.message}`);
+  const result = await supabaseAdmin.rpc("set_personnel_safety_status", {
+    p_personnel_id: id,
+    p_status: status,
+    p_actor_role: identity.role,
+  });
+  if (result.error) throw new Error(`Personnel safety-state update failed: ${result.error.message}`);
 }
 
 export async function updateAssetStatus(id: string, status: AssetStatus) {
@@ -479,8 +578,21 @@ export async function updateCargoTelemetry(cargo: Record<string, unknown>) {
   if (error) throw new Error(`Supabase telemetry write failed: ${error.message}`);
 }
 
-export async function createEmergencyCascade(payload: Record<string, unknown>, cargoIds: string[], voyageIds: string[]) {
+export async function createEmergencyCascade(payload: Record<string, unknown>, cargoIds: string[], voyageIds: string[], identity: OperatorIdentity) {
   await ensureDatabaseReady();
+  if (payload.incidentType === "BLIZZARD_COND_1") {
+    const result = await supabaseAdmin.rpc("create_condition1_cascade", {
+      p_station_id: payload.stationId || null,
+      p_description: String(payload.description || "Condition 1 active"),
+      p_cargo_ids: cargoIds,
+      p_voyage_ids: voyageIds,
+      p_actor_id: identity.userId,
+      p_actor_name: identity.name,
+      p_actor_role: identity.role,
+    });
+    if (result.error) throw new Error(`Condition 1 cascade failed: ${result.error.message}`);
+    return { incident_id: result.data as string };
+  }
   const now = new Date().toISOString();
   const inserted = await supabaseAdmin.from("emergency_incidents").insert({
     station_id: payload.stationId || null,
@@ -502,32 +614,101 @@ export async function createEmergencyCascade(payload: Record<string, unknown>, c
   return inserted.data;
 }
 
-export async function resolveEmergency(incidentId?: string) {
+export async function resolveEmergency(incidentId: string | null, identity: OperatorIdentity, justification: string) {
   await ensureDatabaseReady();
-  let targetIncidentId = incidentId;
-  if (!targetIncidentId) {
-    const latest = await supabaseAdmin.from("emergency_incidents").select("incident_id").eq("is_resolved", false).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (latest.error) throw new Error(`Supabase incident lookup failed: ${latest.error.message}`);
-    targetIncidentId = latest.data?.incident_id;
-  }
-  if (!targetIncidentId) return;
-  const { error } = await supabaseAdmin.from("emergency_incidents").update({
-    is_resolved: true,
-    lockdown_active: false,
-    resolved_at: new Date().toISOString(),
-    action_log: [{ action: "Recovery state declared", at: new Date().toISOString() }],
-  }).eq("incident_id", targetIncidentId);
-  if (error) throw new Error(`Supabase incident recovery failed: ${error.message}`);
+  const result = await supabaseAdmin.rpc("resolve_condition1", {
+    p_incident_id: incidentId,
+    p_actor_id: identity.userId,
+    p_actor_name: identity.name,
+    p_actor_role: identity.role,
+    p_justification: justification,
+  });
+  if (result.error) throw new Error(`Condition 1 recovery failed: ${result.error.message}`);
+  return result.data;
 }
 
-export async function createEvent(event: { module: string; action: string; tone?: Tone; user?: string; justification?: string }) {
+export async function dispatchFieldSortie(
+  input: {
+    id: string;
+    stationId: string;
+    destination: string;
+    leadPersonId: string;
+    expectedReturnTime: string;
+    vehicle?: string;
+    commFrequency: string;
+    satPhoneCallsign?: string;
+    personnelIds: string[];
+  },
+  identity: OperatorIdentity,
+  idempotencyKey: string,
+) {
+  const result = await supabaseAdmin.rpc("dispatch_field_sortie", {
+    p_sortie_id: input.id,
+    p_station_id: input.stationId,
+    p_destination_name: input.destination,
+    p_lead_personnel_id: input.leadPersonId,
+    p_expected_return_time: input.expectedReturnTime,
+    p_vehicle_identifier: input.vehicle || null,
+    p_comm_frequency_vhf: input.commFrequency,
+    p_sat_phone_callsign: input.satPhoneCallsign || null,
+    p_personnel_ids: input.personnelIds,
+    p_actor_id: identity.userId,
+    p_actor_name: identity.name,
+    p_actor_role: identity.role,
+    p_idempotency_key: idempotencyKey,
+  });
+  if (result.error) throw new Error(`Field-sortie dispatch failed: ${result.error.message}`);
+  return result.data;
+}
+
+export async function transitionFieldSortie(
+  sortieId: string,
+  action: "BEACON" | "RETURN" | "CLOSE",
+  personnelId: string | undefined,
+  identity: OperatorIdentity,
+) {
+  const result = await supabaseAdmin.rpc("transition_field_sortie", {
+    p_sortie_id: sortieId,
+    p_action: action,
+    p_personnel_id: personnelId || null,
+    p_actor_id: identity.userId,
+    p_actor_name: identity.name,
+    p_actor_role: identity.role,
+  });
+  if (result.error) throw new Error(`Field-sortie update failed: ${result.error.message}`);
+  return result.data;
+}
+
+export async function createEvent(event: { module: string; action: string; tone?: Tone; justification?: string }, identity: OperatorIdentity) {
   await ensureDatabaseReady();
   const { error } = await supabaseAdmin.from("operation_events").insert({
     module: event.module,
     action: event.action,
     tone: event.tone || "cyan",
-    user_name: event.user,
+    user_name: identity.name,
     justification: event.justification,
+    actor_id: identity.userId,
+    actor_role: identity.role,
   });
   if (error) throw new Error(`Supabase event write failed: ${error.message}`);
+}
+
+export async function decideOperatorAccessRequest(
+  requestId: string,
+  decision: string,
+  justification: string,
+  identity: OperatorIdentity,
+  idempotencyKey: string,
+) {
+  const result = await supabaseAdmin.rpc("decide_operator_access_request", {
+    p_request_id: requestId,
+    p_decision: decision,
+    p_actor_id: identity.userId,
+    p_actor_name: identity.name,
+    p_actor_role: identity.role,
+    p_justification: justification,
+    p_idempotency_key: idempotencyKey,
+  });
+  if (result.error) throw new Error(`Operator decision failed: ${result.error.message}`);
+  return result.data;
 }

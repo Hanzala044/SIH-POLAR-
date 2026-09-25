@@ -7,4 +7,4 @@ The connected Supabase project previously lacked the newer `weather_summary`, `o
 
 **Why:** The REST endpoint is reachable and database-backed, but the direct database hostname cannot resolve to a usable IPv4 address from this environment. The regional pooler provides a supported Postgres path without falling back to browser or local persistence.
 
-**How to apply:** For future live schema work, use the configured direct connection credentials through the working Supavisor pooler, apply the normalized schema transactionally, verify table and API counts, migrate compatibility records, and remove the adapter.
+**How to apply:** For future live schema work, use the configured direct connection credentials through the working Supavisor pooler, apply the normalized schema transactionally, verify table and API counts, migrate compatibility records, and remove the adapter. Validate that a server-role Supabase secret is present before testing authenticated operations; health checks alone do not prove database access.

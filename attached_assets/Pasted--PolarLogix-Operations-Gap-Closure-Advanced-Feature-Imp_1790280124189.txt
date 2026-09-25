@@ -1,0 +1,73 @@
+# PolarLogix Operations – Gap Closure & Advanced Feature Implementation Prompt
+
+You are a senior full-stack engineer + polar logistics domain expert working on the existing PolarLogix Operations codebase (React 19 + Vite + Tailwind + Clerk + Express + Supabase/PostgreSQL + Leaflet + Recharts).
+
+Your task is to close the critical and high-priority gaps identified in the Detailed Project Report (25 Sep 2026) and elevate the application into a high-fidelity, honest, demo-ready centralized command platform that fully satisfies SIH 26062:
+
+> “Develop a centralized digital platform for expedition planning, cargo tracking, inventory management, personnel movement and emergency response.”
+> Theme: Smart Automation
+
+All new work must preserve the existing architecture, authentication, API snapshot pattern, and visual language. Do not break current modules.
+
+---
+
+## 1. Core Principles (Non-Negotiable)
+
+1. **Honesty & Transparency First**
+   - Every number, chart, runway, ETA, readiness index, and fuel coverage must display its exact calculation formula, data source, assumptions, and last-updated timestamp.
+   - Never hide that a value is DEMO / SEEDED / SIMULATED / CALCULATED.
+   - Use a consistent visual badge system:
+     - `LIVE` (green) – only when real data path exists
+     - `DEMO` (amber) – seeded but realistic
+     - `SIMULATED` (purple) – movement / cascade animation
+     - `CALCULATED` (cyan) – derived by transparent formula
+
+2. **Balanced, Realistic, Punctual Demo Data**
+   - All demo data must feel operationally coherent across modules (one shared “theatre state”).
+   - Numbers must be mathematically consistent (e.g. fuel runway = on-hand ÷ daily burn × (1 – emergency uplift)).
+   - Prefer exact integer or 1-decimal values; avoid arbitrary “nice” numbers that look fake.
+
+3. **Centralized Exception Coordination**
+   - An event in one module must visibly and correctly affect related modules (this is the strongest product idea).
+
+4. **Smart Automation Theme**
+   - Add predictive runway, what-if scenarios, cascade impact scoring, and automated recommendation cards.
+
+5. **Safety Boundary**
+   - Keep the existing “NO LIVE NAVIGATION CONTROL” banner.
+   - All simulated movement and Condition 1 effects remain clearly labeled.
+
+---
+
+## 2. Gaps to Close (from the Project Report)
+
+### Critical
+- Demo/simulated data looks live → mandatory provenance badges + source timestamps
+- No resilient offline queue → implement a real client-side store-and-forward queue with visible count and conflict resolution
+- Incomplete RBAC → server-side role checks (Command, Logistics, Safety, Viewer) with least-privilege
+- Cascade not atomic → make emergency cascade transactional or compensatable with partial-failure states
+- Static sensor/weather/readiness values → replace with calculated + transparent demo streams that update on a realistic cadence
+
+### High
+- Field sorties incomplete → finish the field-sortie lifecycle (dispatch → check-in → return → close)
+- Approvals only localStorage → move to durable server-side approval records with role gates
+- Audit export client-only → add server-side immutable export endpoint
+- No true offline mode → implement offline detection + queued mutations + “stale data” warnings
+- Fuel runway & forecasts are presentation only → make them pure functions with visible formulas
+
+---
+
+## 3. New / Enhanced Features to Implement
+
+### A. Universal Provenance & Calculation Transparency Layer
+- Create a reusable `<MetricCard>` and `<CalculatedValue>` component that always shows:
+  - Value
+  - Badge (LIVE / DEMO / SIMULATED / CALCULATED)
+  - Formula (e.g. `Fuel Days = 18 420 L ÷ 860 L/day × 0.82 emergency reserve = 17.6 d`)
+  - Inputs used
+  - Last calculated / last source timestamp (UTC)
+  - Confidence or validity window
+- Apply this to every headline card on Overview, Inventory, Personnel, Cargo, Expedition, Assets, Emergency.
+
+### B. Honest Fuel & Life-Support Runway Engine
+- Replace static charts with a pure calculation engine:

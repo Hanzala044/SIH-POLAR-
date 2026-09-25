@@ -1,5 +1,7 @@
 - [PolarLogix prototype boundary](polarlogix-prototype.md) — local-first demo adapter now; preserve the same cascade contract when Supabase realtime is wired.
+- [Offline sortie identity](offline-sortie-identity.md) — client-generated UUIDs keep queued sortie follow-ups attached to the dispatch.
 - [Workspace dependency installs](workspace-dependencies.md) — artifact-specific packages need a filtered pnpm install; the generic helper targets the monorepo root.
 - [Supabase schema compatibility](supabase-schema-compatibility.md) — the live project schema predates the local SQL additions; migrate normalized tables before removing the compatibility adapter.
 - [Supabase-only merge setup](supabase-post-merge.md) — post-merge validation must not invoke removed local database filters; use scoped artifact checks instead.
 - [Operator live verification](operator-live-verification.md) — the managed browser tester may be unavailable in Free mode; preserve a server-side Clerk-to-Supabase verification path.
+- [Read-only demo boundary](polarlogix-demo-access.md) — the development demo is fixture-only and cannot authenticate to or mutate server state; keep shared credentials out of the app.

@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "-my9lgllDt3dKJk6iLuNk"
+uri = "file://reports/PolarLogix_Detailed_Project_Report.pdf"
+type = "pdf"
+title = "PolarLogix Detailed Project Report"
+description = "22-page review of every application page, workflows, stack, data flows, feasibility, business model, readiness risks and terminology glossary."
+logical_id = "956ec90b-01c1-4151-b89e-ea3254ec46a6"
+content_hash = "sha256:bd72a0c745f5deeab8f2fb99cdec651f92166c2ef42122c9cf342beabd396f67"
+size = 366179
+mtime_ms = 1790279287916
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:40f34216-292c-4fbc-8a91-8a38ed883ecc/956ec90b-01c1-4151-b89e-ea3254ec46a6/e264452f-469d-4e30-ae7b-b34f4e26dd5e"
+storage_version_token = "1790279319071504"
+content_type = "application/pdf"
